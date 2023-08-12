@@ -1,5 +1,5 @@
 
-pub const BASE_DIR: &str = "";
+pub const BASE_DIR: &str = "/Users/vt/Documents/LegendOfMir";
 
 pub const DATA_DIR_NAME: &str = "data";
 
