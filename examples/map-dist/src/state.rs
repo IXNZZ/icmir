@@ -1,14 +1,11 @@
-use std::fmt::format;
-use std::fs::File;
-use std::io::{BufReader, Read, sink};
+
 use std::path::Path;
-use bytes::{Buf, Bytes};
 use ggez::{Context, GameError, GameResult, graphics};
-use ggez::event::{EventHandler, ScanCode};
+use ggez::event::{EventHandler};
 use ggez::glam::Vec2;
 use ggez::graphics::{Canvas, Color, DrawParam, InstanceArray, Quad, Rect};
 use ggez::input::keyboard::{KeyCode, KeyInput};
-use crate::file::MapInfo;
+use file::map;
 
 pub struct App{
     index: usize,
@@ -18,12 +15,12 @@ pub struct App{
     files: Vec<String>,
     array: InstanceArray,
     title: String,
-    map: Option<crate::file::MapInfo>
+    map: Option<map::MapInfo>
 }
 
 impl App {
     pub fn new(_ctx: &mut Context) -> GameResult<Self> {
-        let dir = Path::new("/Users/vinter/Dev/Mir2/Map");
+        let dir = Path::new("/Users/vt/Documents/LegendOfMir/Map");
         let files: Vec<String> = dir.read_dir()?.map(|x| { String::from(x.unwrap().path().as_os_str().to_str().unwrap()) })
             .filter(|x| { x.ends_with(".map") }).collect();
         let mut array = InstanceArray::new(_ctx, None);
@@ -39,7 +36,8 @@ impl App {
         }
 
         let x = self.files.get(idx).unwrap();
-        let map = crate::file::read_map_file(x);
+
+        let map = map::read_map_file(x);
         self.title = format!("idx: {}, w: {}, h: {}, step: {}, size: {}, name: {}", self.index, map.width, map.height, map.step, map.size, map.name.clone());
         // self.map = Some(map);
         self.array.clear();
@@ -50,7 +48,14 @@ impl App {
             let y = i as u32 % map.height;
             let tile = map.tiles.get(i).unwrap();
             if tile.back & 0x7FFF > 0 {
-                let dp = DrawParam::new().dest_rect(Rect::new_i32(x as i32, y as i32, 1, 1)).color(Color::RED);
+                let mut color = Color::RED;
+                for j in 0..i {
+                    if map.tiles.get(j).unwrap().back == tile.back {
+                        color = Color::GREEN;
+                        break;
+                    }
+                }
+                let dp = DrawParam::new().dest_rect(Rect::new_i32(x as i32, y as i32, 1, 1)).color(color);
                 self.array.push(dp);
             }
         }
