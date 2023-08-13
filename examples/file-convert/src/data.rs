@@ -19,17 +19,17 @@ pub fn convert_data() {
         let (name, _) = i.split_at(i.len() - 4);
         let wzl = String::from(name) + ".wzl";
         let index = check_file(i.as_str(), wzl.as_str());
-        // let path = Path::new(config::BASE_DIR).join(config::DATA_DIR_NAME).join(name.to_string() + ".idx");
-        // if path.exists() {
-        //     fs::remove_file(path.clone()).unwrap();
-        // }
-        // sum += index.len();
-        // let mut idx = File::create(path).unwrap();
-        // for i in index {
-        //     idx.write_all(&u32::to_le_bytes(i)[..]).unwrap();
-        // }
-        // idx.flush().unwrap();
-        println!("index count:{}, file: {}", index.len(), name);
+        let path = Path::new(config::BASE_DIR).join(config::DATA_DIR_NAME).join(name.to_string() + ".idx");
+        if path.exists() {
+            fs::remove_file(path.clone()).unwrap();
+        }
+        sum += index.len();
+        let mut idx = File::create(path).unwrap();
+        for i in index {
+            idx.write_all(&u32::to_le_bytes(i)[..]).unwrap();
+        }
+        idx.flush().unwrap();
+        // println!("index count:{}, file: {}", index.len(), name);
     }
     println!("success: {}", sum);
 }
@@ -137,6 +137,7 @@ fn read_wzl(path: &str, idx: &[u32]) -> Vec<u32> {
             reader.seek(SeekFrom::Current(wzl.length as i64)).unwrap();
         }
     }
+    index.push(file_size as u32);
     if pos != file_size {
         let sub = if count > length { count - length} else { length - count };
         println!("total ==---> imageCount: {:05}, length: {:05}, checkCount: {:03}, checkSize: {}, prev: {:05}, pos: {:08}, fileSize: {:08}, file: {:?}",
