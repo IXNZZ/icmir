@@ -1,6 +1,6 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
-use bytes::Buf;
+use bytes::{Buf, Bytes};
 use flate2::{FlushDecompress, Status};
 use tracing::{debug, info, warn};
 use crate::data::color::PALETTE;
@@ -10,7 +10,7 @@ pub struct ImageData {
     pub height: u16,
     pub offset_x: i16,
     pub offset_y: i16,
-    pub bytes: Vec<u8>,
+    pub bytes: Bytes,
 }
 
 impl ImageData {
@@ -28,13 +28,13 @@ impl ImageData {
         let length = body.get_u32_le();
 
         if length == 0 {
-            Self { width, height, offset_x, offset_y, bytes: Vec::new() }
+            Self { width, height, offset_x, offset_y, bytes: Bytes::new() }
         } else {
             let x = &body[..length as usize];
             let x = deflate_image(x, width as u32 * height as u32);
-            let bytes = byte_to_rgb(pixel, &x[..]);
-            debug!("S3 length: {}, w: {}, h: {}, pixel: {}, x: {}, bytes: {}", length, width, height, pixel, x.len(), bytes.len());
-            Self { width, height, offset_x, offset_y, bytes }
+            let data = byte_to_rgb(pixel, &x[..]);
+            debug!("S3 length: {}, w: {}, h: {}, pixel: {}, x: {}, bytes: {}", length, width, height, pixel, x.len(), data.len());
+            Self { width, height, offset_x, offset_y, bytes: Bytes::from(data) }
         }
     }
 }
@@ -76,23 +76,25 @@ fn deflate_image(input: &[u8], size: u32) -> Vec<u8> {
 
 fn byte_to_rgb(pixel: u8, bytes: &[u8]) -> Vec<u8> {
     if pixel == 3 {
-        let mut result = Vec::with_capacity(bytes.len() * 3);
+        let mut result = Vec::with_capacity(bytes.len() * 4);
         for b in bytes {
             let x = &PALETTE[*b as usize];
-            result.push(x.0);
-            result.push(x.1);
             result.push(x.2);
+            result.push(x.1);
+            result.push(x.0);
+            result.push(255);
         }
         return result;
     }
-    let mut result = Vec::with_capacity(bytes.len() / 2 * 3);
+    let mut result = Vec::with_capacity(bytes.len() * 2);
     // debug!("S2 old: {}, new: {}", bytes.len(), bytes.len() / 2 * 3);
     for x in 0..bytes.len() {
         if x % 2 == 0 {
             if x + 1 >= bytes.len() { break; }
-            result.push(bytes[x] & 0xF8);
-            result.push(((bytes[x] & 0x07) << 3) + ((bytes[x+ 1] & 0xE0) >> 5));
             result.push(bytes[x + 1] & 0x1F);
+            result.push(((bytes[x] & 0x07) << 3) + ((bytes[x+ 1] & 0xE0) >> 5));
+            result.push(bytes[x] & 0xF8);
+            result.push(255);
         }
     }
     result

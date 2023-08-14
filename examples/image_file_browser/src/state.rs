@@ -1,18 +1,23 @@
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
-use iced::{Alignment, Element, Length, Renderer, Sandbox, theme};
-use iced::widget::{button, Button, column, Column, row, Row, scrollable, Text};
+use file::data::ImageData;
+use iced::{Alignment, Element, Length, Renderer, Sandbox, theme, widget};
+use iced::futures::{FutureExt, StreamExt};
+use iced::widget::{button, Button, column, text, container, image, row, Row, scrollable, Text};
+use rfd::FileDialog;
 use tracing::info;
 
+type Image = iced::widget::Image;
 
 pub struct State{
     index: usize,
     dir: String,
     files: Vec<String>,
-    images: Vec<u32>,
+    image_idx: Vec<u32>,
     page: u32,
     page_size: u32,
+    images: Vec<ImageData>
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -31,15 +36,27 @@ impl State {
         let name = &name[..name.len() - 4];
         let path = self.dir.to_string() + "/" + name + ".wzl";
         let start_idx = self.page * self.page_size;
-        let end_idx = if start_idx + self.page_size + 1 > self.images.len() as u32 {
-            self.images.len() as u32
+        let end_idx = if start_idx + self.page_size + 1 > self.image_idx.len() as u32 {
+            self.image_idx.len() as u32
         } else { start_idx + self.page_size + 1 };
         if start_idx >= end_idx { return; }
 
-        let x = &self.images[start_idx as usize..end_idx as usize];
+        let x = &self.image_idx[start_idx as usize..end_idx as usize];
+        let mut images = Vec::with_capacity(x.len() - 1);
         for i in 0..x.len() - 1 {
-            file::data::load_image(path.as_str(), x[i], x[i+1]);
+            let img = file::data::load_image(path.as_str(), x[i], x[i+1]);
+            // if img.bytes.len() == 0 {
+            //     images.push(image::Handle::from_pixels(1, 1, [0, 0, 0, 0]));
+            //     continue;
+            // }
+            // let new_width = img.bytes.len() / 4 / img.height as usize;
+            // let image = image::Handle::from_pixels(new_width as u32, img.height as u32, img.bytes);
+            // // let image1 = Image::new(image).height(32).width(48);
+            //
+            // // widget::Image
+            images.push(img);
         }
+        self.images = images;
     }
 }
 
@@ -47,13 +64,8 @@ impl Sandbox for State {
     type Message = AppMessage;
 
     fn new() -> Self {
-        let mut files: Vec<String> = Path::new("/Users/vt/Documents/LegendOfMir/data").read_dir().unwrap()
-            .map(|f| { String::from(f.unwrap().file_name().to_str().unwrap()) })
-            .filter(|f| { f.ends_with(".idx") }).collect();
-        files.sort();
-        files.remove(0);
-        info!("init: {}", files.len());
-        Self { index: 0, dir: "/Users/vt/Documents/LegendOfMir/data".to_string(), files, images: Vec::new(), page: 0, page_size: 50 }
+
+        Self { index: 0, dir: "".to_string(), files: Vec::new(), image_idx: Vec::new(), page: 0, page_size: 50, images: Vec::new() }
     }
 
     fn title(&self) -> String {
@@ -65,10 +77,30 @@ impl Sandbox for State {
             AppMessage::SelectIndex(idx) => {
                 self.index = idx;
                 let path = self.dir.to_string() + "/" + self.files.get(idx - 1).unwrap();
-                self.images = file::data::load_index(path.as_str());
+                self.image_idx = file::data::load_index(path.as_str());
 
                 self.load_images();
-            }
+            },
+            AppMessage::PagePrev(p) => {
+                if self.page > 0 { self.page -= p }
+                self.load_images();
+            },
+            AppMessage::PageNext(p) => {
+                if self.page * self.page_size < self.image_idx.len() as u32 { self.page += p }
+                self.load_images();
+            },
+            AppMessage::OpenFile => {
+                let dir = FileDialog::new().set_directory("~/").pick_folder().unwrap();
+                // let dir = "/Users/vinter/Dev/Mir2/data";
+                let mut files: Vec<String> = dir.read_dir().unwrap()
+                    .map(|f| { String::from(f.unwrap().file_name().to_str().unwrap()) })
+                    .filter(|f| { f.ends_with(".idx") }).collect();
+                files.sort();
+                files.remove(0);
+                info!("init: {}, dir: {:?}", files.len(), dir);
+                self.dir = dir.to_str().unwrap().to_string();
+                self.files = files;
+            },
             _ => {
 
             }
@@ -84,7 +116,7 @@ impl Sandbox for State {
         ].width(Length::Fill)
             .align_items(Alignment::Center)
             .padding([5, 0, 5, 10])
-            .spacing(30);
+            .spacing(20);
 
         let x = column(self.files.iter().enumerate()
             .map(|(x, r)| {
@@ -94,12 +126,29 @@ impl Sandbox for State {
                     .style(if x + 1 == self.index {theme::Button::Primary} else { theme::Button::Text })
                     .on_press(AppMessage::SelectIndex(x + 1)).into()})
             .collect::<Vec<_>>());
+        // let chunks = self.images.iter().enumerate().map(|(i, h)| {
+        //     Image::new(h.clone()).width(48).height(32).into()
+        // }).chunks(10);
+        let mut idx = self.page * self.page_size;
+        let content = column(self.images.chunks(10).map(|x| {
+            row::<Self::Message, Renderer>(x.iter().enumerate().map(|(i, h)| {
+                let t1 = format!("{:05}", idx);
+                let t2 = format!("{}X{}", h.width, h.height);
+                idx += 1;
+                let handle = if h.bytes.len() == 0 {
+                    image::Handle::from_pixels(1, 1, [0, 0, 0, 0])
+                } else {
+                    image::Handle::from_pixels(h.bytes.len() as u32 / 4 / h.height as u32, h.height as u32, h.bytes.clone())
+                };
+                column![
+                    Image::new(handle).width(96).height(64), widget::text(t1), widget::text(t2)
+                ].into()
+                // Image::new(h.clone()).width(96).height(64).into()
+            }).collect::<Vec<_>>()).into()
+        }).collect::<Vec<_>>());
 
+        let center = row![scrollable(x), scrollable(content)];
 
-
-
-        column![menu, scrollable(x)].into()
+        column![menu, center].into()
     }
-
-
 }

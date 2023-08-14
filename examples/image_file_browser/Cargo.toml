@@ -6,10 +6,11 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-iced = "0.9"
+iced = {version = "0.9", features = ["image"]}
 lazy_static = "1.4.0"
 image = "0.24.6"
 file = { path = "../../file" }
 tracing = "0.1"
 tracing-subscriber = {version = "0.3", features = ["env-filter"]}
 chrono = "0.4"
+rfd = "0.11"
