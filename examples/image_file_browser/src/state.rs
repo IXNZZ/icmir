@@ -45,15 +45,6 @@ impl State {
         let mut images = Vec::with_capacity(x.len() - 1);
         for i in 0..x.len() - 1 {
             let img = file::data::load_image(path.as_str(), x[i], x[i+1]);
-            // if img.bytes.len() == 0 {
-            //     images.push(image::Handle::from_pixels(1, 1, [0, 0, 0, 0]));
-            //     continue;
-            // }
-            // let new_width = img.bytes.len() / 4 / img.height as usize;
-            // let image = image::Handle::from_pixels(new_width as u32, img.height as u32, img.bytes);
-            // // let image1 = Image::new(image).height(32).width(48);
-            //
-            // // widget::Image
             images.push(img);
         }
         self.images = images;
@@ -75,6 +66,7 @@ impl Sandbox for State {
     fn update(&mut self, message: Self::Message) {
         match message {
             AppMessage::SelectIndex(idx) => {
+                self.page = 0;
                 self.index = idx;
                 let path = self.dir.to_string() + "/" + self.files.get(idx - 1).unwrap();
                 self.image_idx = file::data::load_index(path.as_str());
@@ -82,12 +74,16 @@ impl Sandbox for State {
                 self.load_images();
             },
             AppMessage::PagePrev(p) => {
-                if self.page > 0 { self.page -= p }
-                self.load_images();
+                if self.page > 0 {
+                    self.page -= p;
+                    self.load_images();
+                }
             },
             AppMessage::PageNext(p) => {
-                if self.page * self.page_size < self.image_idx.len() as u32 { self.page += p }
-                self.load_images();
+                if (self.page + 1) * self.page_size < self.image_idx.len() as u32 {
+                    self.page += p;
+                    self.load_images();
+                }
             },
             AppMessage::OpenFile => {
                 let dir = FileDialog::new().set_directory("~/").pick_folder().unwrap();
@@ -113,6 +109,7 @@ impl Sandbox for State {
             button("选择目录").on_press(AppMessage::OpenFile).height(30),
             button("上一页").on_press(AppMessage::PagePrev(1)).height(30),
             button("下一页").on_press(AppMessage::PageNext(1)).height(30),
+            text(format!("数量: {}, 当前: {}-{}", self.image_idx.len(), self.page * self.page_size, self.page * self.page_size + self.page_size))
         ].width(Length::Fill)
             .align_items(Alignment::Center)
             .padding([5, 0, 5, 10])
@@ -133,12 +130,13 @@ impl Sandbox for State {
         let content = column(self.images.chunks(10).map(|x| {
             row::<Self::Message, Renderer>(x.iter().enumerate().map(|(i, h)| {
                 let t1 = format!("{:05}", idx);
+                let new_width = if h.bytes.len() != 0 { h.bytes.len() as u32 / 4 / h.height as u32 } else { h.width as u32 };
                 let t2 = format!("{}X{}", h.width, h.height);
                 idx += 1;
                 let handle = if h.bytes.len() == 0 {
                     image::Handle::from_pixels(1, 1, [0, 0, 0, 0])
                 } else {
-                    image::Handle::from_pixels(h.bytes.len() as u32 / 4 / h.height as u32, h.height as u32, h.bytes.clone())
+                    image::Handle::from_pixels(h.width as u32, h.height as u32, h.bytes.clone())
                 };
                 column![
                     Image::new(handle).width(96).height(64), widget::text(t1), widget::text(t2)

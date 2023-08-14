@@ -32,7 +32,7 @@ impl ImageData {
         } else {
             let x = &body[..length as usize];
             let x = deflate_image(x, width as u32 * height as u32);
-            let data = byte_to_rgb(pixel, &x[..]);
+            let data = byte_to_rgb(pixel, width as usize, height as usize, &x[..]);
             debug!("S3 length: {}, w: {}, h: {}, pixel: {}, x: {}, bytes: {}", length, width, height, pixel, x.len(), data.len());
             Self { width, height, offset_x, offset_y, bytes: Bytes::from(data) }
         }
@@ -40,7 +40,7 @@ impl ImageData {
 }
 
 pub fn load_image(path: &str, start: u32, end: u32) -> ImageData {
-    debug!("S1 start: {}, end: {}, len: {}, path: {}", start, end, end - start, path);
+    debug!("S1 start: {}, end: {}, len: , path: {}", start, end, path);
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
     let mut data = vec![0;(end - start) as usize];
@@ -74,30 +74,43 @@ fn deflate_image(input: &[u8], size: u32) -> Vec<u8> {
     rs
 }
 
-fn byte_to_rgb(pixel: u8, bytes: &[u8]) -> Vec<u8> {
+fn byte_to_rgb(pixel: u8, width: usize, height: usize, bytes: &[u8]) -> Vec<u8> {
+
     if pixel == 3 {
         let mut result = Vec::with_capacity(bytes.len() * 4);
-        for b in bytes {
-            let x = &PALETTE[*b as usize];
-            result.push(x.2);
-            result.push(x.1);
-            result.push(x.0);
-            result.push(255);
+        let new_width = bytes.len() / height;
+        let n_width = (width + 3) / 4 * 4;
+        let n_width = if n_width > new_width { new_width } else { n_width };
+        let n_width = if new_width > n_width { width } else { n_width };
+        for i in 0..height {
+            for j in 0..width {
+                let x = bytes[(height - i - 1) * n_width + j];
+                let c = &PALETTE[x as usize];
+                // data.push()
+                result.push(c.2);
+                result.push(c.1);
+                result.push(c.0);
+                result.push(255);
+            }
+        }
+        return result;
+    } else {
+        let mut result = Vec::with_capacity(bytes.len() * 2);
+        let new_width = bytes.len() / height / 2;
+        let n_width = (width + 3) / 4 * 4;
+        let n_width = if n_width > new_width { new_width } else { n_width };
+        let n_width = if new_width > n_width { width } else { n_width };
+        for i in 0..height {
+            for j in 0..width {
+                let p = (height - i - 1) * n_width * 2 + j * 2;
+                result.push(bytes[p + 1] & 0xF8);
+                result.push((((bytes[p + 1] & 0x7) << 3) | (bytes[p] >> 5)) * 4);
+                result.push((bytes[p] & 0x1F) * 8);
+                result.push(255);
+            }
         }
         return result;
     }
-    let mut result = Vec::with_capacity(bytes.len() * 2);
-    // debug!("S2 old: {}, new: {}", bytes.len(), bytes.len() / 2 * 3);
-    for x in 0..bytes.len() {
-        if x % 2 == 0 {
-            if x + 1 >= bytes.len() { break; }
-            result.push(bytes[x + 1] & 0x1F);
-            result.push(((bytes[x] & 0x07) << 3) + ((bytes[x+ 1] & 0xE0) >> 5));
-            result.push(bytes[x] & 0xF8);
-            result.push(255);
-        }
-    }
-    result
 }
 
 mod color {
