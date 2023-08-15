@@ -13,13 +13,13 @@ pub fn convert_data() {
         String::from(x.unwrap().path().to_str().unwrap())
     }).filter(|x| { x.ends_with(".wzx") }).collect();
     files.sort();
-    // let output_dir = "/Users/vt/Documents/LegendOfMir/data";
     let mut sum = 0;
     for i in files {
         let (name, _) = i.split_at(i.len() - 4);
         let wzl = String::from(name) + ".wzl";
         let index = check_file(i.as_str(), wzl.as_str());
         let path = Path::new(config::BASE_DIR).join(config::DATA_DIR_NAME).join(name.to_string() + ".idx");
+        println!("write: {}, To: {:?}", index.len(), path);
         if path.exists() {
             fs::remove_file(path.clone()).unwrap();
         }
@@ -100,9 +100,7 @@ fn read_wzl(path: &str, idx: &[u32]) -> Vec<u32> {
             break;
         }
 
-        if prev_len != 0 && prev_len + 16 + prev != pos {
-            println!("idx: {:05}, prev: {}, prev_len: {}, pos: {:08}, wzl: {:?}, file: {:?}", count, prev, prev_len, pos, wzl, file_name);
-        }
+        // println!("idx: {:05}, prev: {}, prev_len: {}, pos: {:08}, wzl: {:?}, file: {:?}", count, prev, prev_len, pos, wzl, file_name);
 
         index.push(pos as u32);
         prev_len = wzl.length as u64;

@@ -33,7 +33,7 @@ impl State {
         if self.index == 0 { return; }
         let idx = self.index - 1;
         let name = self.files.get(idx).unwrap().as_str();
-        let name = &name[..name.len() - 4];
+        // let name = &name[..name.len() - 4];
         let path = self.dir.to_string() + "/" + name + ".wzl";
         let start_idx = self.page * self.page_size;
         let end_idx = if start_idx + self.page_size + 1 > self.image_idx.len() as u32 {
@@ -68,7 +68,7 @@ impl Sandbox for State {
             AppMessage::SelectIndex(idx) => {
                 self.page = 0;
                 self.index = idx;
-                let path = self.dir.to_string() + "/" + self.files.get(idx - 1).unwrap();
+                let path = self.dir.to_string() + "/" + self.files.get(idx - 1).unwrap() + ".idx";
                 self.image_idx = file::data::load_index(path.as_str());
 
                 self.load_images();
@@ -87,12 +87,12 @@ impl Sandbox for State {
             },
             AppMessage::OpenFile => {
                 let dir = FileDialog::new().set_directory("~/").pick_folder().unwrap();
-                // let dir = "/Users/vinter/Dev/Mir2/data";
                 let mut files: Vec<String> = dir.read_dir().unwrap()
-                    .map(|f| { String::from(f.unwrap().file_name().to_str().unwrap()) })
-                    .filter(|f| { f.ends_with(".idx") }).collect();
+                    .map(|f| { f.unwrap().file_name().to_str().unwrap().to_lowercase() })
+                    .filter(|f| { f.ends_with(".idx") })
+                    .map(|x| {x.split_at(x.len() -4).0.to_lowercase()})
+                    .collect();
                 files.sort();
-                files.remove(0);
                 info!("init: {}, dir: {:?}", files.len(), dir);
                 self.dir = dir.to_str().unwrap().to_string();
                 self.files = files;
