@@ -86,16 +86,17 @@ impl Sandbox for State {
                 }
             },
             AppMessage::OpenFile => {
-                let dir = FileDialog::new().set_directory("~/").pick_folder().unwrap();
-                let mut files: Vec<String> = dir.read_dir().unwrap()
-                    .map(|f| { f.unwrap().file_name().to_str().unwrap().to_lowercase() })
-                    .filter(|f| { f.ends_with(".idx") })
-                    .map(|x| {x.split_at(x.len() -4).0.to_lowercase()})
-                    .collect();
-                files.sort();
-                info!("init: {}, dir: {:?}", files.len(), dir);
-                self.dir = dir.to_str().unwrap().to_string();
-                self.files = files;
+                if let Some(dir) = FileDialog::new().set_directory("~/").pick_folder() {
+                    let mut files: Vec<String> = dir.read_dir().unwrap()
+                        .map(|f| { f.unwrap().file_name().to_str().unwrap().to_lowercase() })
+                        .filter(|f| { f.ends_with(".idx") })
+                        .map(|x| {x.split_at(x.len() -4).0.to_lowercase()})
+                        .collect();
+                    files.sort();
+                    info!("init: {}, dir: {:?}", files.len(), dir);
+                    self.dir = dir.to_str().unwrap().to_string();
+                    self.files = files;
+                }
             },
             _ => {
 

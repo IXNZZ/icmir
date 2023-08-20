@@ -5,6 +5,7 @@ use flate2::{FlushDecompress, Status};
 use tracing::{debug, info, warn};
 use crate::data::color::PALETTE;
 
+#[derive(Default)]
 pub struct ImageData {
     pub width: u16,
     pub height: u16,
@@ -15,7 +16,32 @@ pub struct ImageData {
 
 impl ImageData {
     pub fn from(src: &[u8]) -> Self {
-        let mut body = src;
+        // let mut body = src;
+        // let pixel = body.get_u8();
+        // let _compress = body.get_u8();
+        // let _reserve = body.get_u8();
+        // let _compress_level = body.get_u8();
+        //
+        // let width = body.get_u16_le();
+        // let height = body.get_u16_le();
+        // let offset_x = body.get_i16_le();
+        // let offset_y = body.get_i16_le();
+        // let length = body.get_u32_le();
+        //
+        // if length == 0 {
+        //     Self { width, height, offset_x, offset_y, bytes: Bytes::new() }
+        // } else {
+        //     let x = &body[..length as usize];
+        //     let x = deflate_image(x, width as u32 * height as u32);
+        //     let data = byte_to_rgb(pixel, width as usize, height as usize, &x[..]);
+        //     debug!("S3 length: {}, w: {}, h: {}, pixel: {}, x: {}, bytes: {}", length, width, height, pixel, x.len(), data.len());
+        //     Self { width, height, offset_x, offset_y, bytes: Bytes::from(data) }
+        // }
+        Self::from_head_data(&src[..16], &src[16..])
+    }
+
+    pub fn from_head_data(head: &[u8], data: &[u8]) -> Self {
+        let mut body = head;
         let pixel = body.get_u8();
         let _compress = body.get_u8();
         let _reserve = body.get_u8();
@@ -30,8 +56,7 @@ impl ImageData {
         if length == 0 {
             Self { width, height, offset_x, offset_y, bytes: Bytes::new() }
         } else {
-            let x = &body[..length as usize];
-            let x = deflate_image(x, width as u32 * height as u32);
+            let x = deflate_image(data, width as u32 * height as u32);
             let data = byte_to_rgb(pixel, width as usize, height as usize, &x[..]);
             debug!("S3 length: {}, w: {}, h: {}, pixel: {}, x: {}, bytes: {}", length, width, height, pixel, x.len(), data.len());
             Self { width, height, offset_x, offset_y, bytes: Bytes::from(data) }
@@ -46,6 +71,15 @@ pub fn load_image(path: &str, start: u32, end: u32) -> ImageData {
     let mut data = vec![0;(end - start) as usize];
     reader.seek(SeekFrom::Start(start as u64)).unwrap();
     reader.read(&mut data[..]).unwrap();
+    if end - start == 16 {
+        let mut x = &data[12..];
+        let x = x.get_u32_le();
+        if x > 0 {
+            let mut i = vec![0; x as usize];
+            reader.read(&mut i[..]).unwrap();
+            return ImageData::from_head_data(&data[..], &i[..]);
+        }
+    }
     ImageData::from(&data[..])
 }
 

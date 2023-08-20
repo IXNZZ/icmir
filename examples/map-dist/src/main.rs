@@ -4,6 +4,8 @@ use ggez::conf::{WindowMode, WindowSetup};
 
 mod state;
 mod file;
+mod view;
+mod asset;
 
 fn main() -> GameResult {
     // We add the CARGO_MANIFEST_DIR/resources to the resource paths
@@ -23,7 +25,7 @@ fn main() -> GameResult {
 
     let (mut ctx, event_loop) = cb.build()?;
 
-    let mut state = state::App::new(&mut ctx)?;
-    state.load_tile(&mut ctx, 0);
-    event::run(ctx, event_loop, state)
+    let mut app = view::App::new(&mut ctx);
+    // state.load_tile(&mut ctx, 0);
+    event::run(ctx, event_loop, app)
 }
