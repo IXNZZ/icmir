@@ -1,5 +1,6 @@
 use std::fs::File;
 use std::io::{BufReader, Read, Seek, SeekFrom};
+use std::path::Path;
 use bytes::{Buf, Bytes};
 use flate2::{FlushDecompress, Status};
 use tracing::{debug, info, warn};
@@ -90,9 +91,24 @@ pub fn load_index(path: &str) -> Vec<u32> {
     let len = file.metadata().unwrap().len();
     let mut data = Vec::with_capacity(len as usize);
     file.read_to_end(&mut data).unwrap();
-    let mut data = &data[48..];
-    let mut result = Vec::with_capacity(len as usize / 4 - 12);
+    let mut data = &data[..];
     let len = data.len() / 4;
+    let mut result = Vec::with_capacity(len);
+    for _ in 0..len {
+        result.push(data.get_u32_le());
+    }
+    result
+}
+
+pub fn read_wzx(path: &str) -> Vec<u32> {
+    info!("read_wzx {}", path);
+    let mut file = File::open(path).unwrap();
+    let len = file.metadata().unwrap().len();
+    let mut data = Vec::with_capacity(len as usize);
+    file.read_to_end(&mut data).unwrap();
+    let mut data = &data[48..];
+    let len = data.len() / 4;
+    let mut result = Vec::with_capacity(len);
     for _ in 0..len {
         result.push(data.get_u32_le());
     }
@@ -145,7 +161,7 @@ fn byte_to_rgb(pixel: u8, width: usize, height: usize, bytes: &[u8]) -> Vec<u8> 
                 result.push(r);
                 result.push(g);
                 result.push(b);
-                result.push(if r + g + b == 0 { 0 } else { 255 });
+                result.push(if r == 0 && g == 0 && b == 0 { 0 } else { 255 });
             }
         }
         return result;

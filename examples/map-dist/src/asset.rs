@@ -26,7 +26,7 @@ pub struct MapAsset {
 
 pub struct ImageAsset {
     dir: String,
-    pub image: HashMap<u32, ImageData>,
+    pub image: HashMap<u64, ImageData>,
     pub index: HashMap<String, Vec<u32>>,
 }
 
@@ -35,28 +35,34 @@ impl ImageAsset {
     pub fn new(dir: &str) -> Self {
         Self {dir: dir.to_string(), image: HashMap::new(), index: HashMap::new()}
     }
-    pub fn load_image_asset(&mut self, name: &str, file: u8, idx: u32) -> Option<ImageData> {
+    pub fn load_image_asset(&mut self, name: &str, file: u8, idx: u32) -> Option<&ImageData> {
         let key = self.convert_file_name(self.dir.as_str(), name, file, "wzx");
         let f = self.convert_file_name(self.dir.as_str(), name, file, "wzl");
-        // if !self.image.contains_key(&key) {
+
             if !self.index.contains_key(&key) {
-                let index = file::data::load_index(key.as_str());
+                let index = file::data::read_wzx(key.as_str());
                 self.index.insert(key.clone(), index);
             }
             if let Some(index) = self.index.get(key.as_str()) {
                 let i = index[idx as usize];
-                debug!("image:{} idx: {}, file: {}, key: {}", idx, i, f, key);
-                let image_data = file::data::load_image(f.as_str(), i, i + 16);
-                return Some(image_data);
-                //self.image.insert(key.clone(), image_data);
+                let h = name.as_bytes()[0] as u64;
+                let c = file as u64;
+                let k = h << 40 | c << 32 | i as u64;
+                if !self.image.contains_key(&k) {
+                    debug!("image:{} idx: {}, file: {}, key: {}", idx, i, f, key);
+                    let image_data = file::data::load_image(f.as_str(), i, i + 16);
+                    self.image.insert(k, image_data);
+                    // return Some(image_data);
+                    //self.image.insert(key.clone(), image_data);
+                }
+                return self.image.get(&k);
             }
-        // }
 
-        Some(ImageData::default())
+        None
     }
 
     fn convert_file_name(&self, dir: &str, name: &str, file: u8, suffix: &str) -> String {
-        if file == 0 {
+        if file <= 1 {
             format!("{}{}.{}", dir, name, suffix)
         } else {
             format!("{}{}{}.{}", dir, name, file, suffix)
@@ -114,12 +120,10 @@ impl MapAsset {
         let end_x = start_x + self.max_x_tile as i32;
         let end_y = start_y + self.max_y_tile as i32 + 1;
 
-        let mut back_image = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
-        let mut middle_image = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
-        let mut objects_image = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
-        let back_image = back_image.image(ctx);
-        let middle_image = middle_image.image(ctx);
-        let objects_image = objects_image.image(ctx);
+        let mut screen_image = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
+        let back_image = screen_image.image(ctx);
+        let middle_image = screen_image.image(ctx);
+        let objects_image = screen_image.image(ctx);
         let mut back_canvas = Canvas::from_image(ctx, back_image.clone(), None);
         let mut sm_canvas = Canvas::from_image(ctx, middle_image.clone(), None);
         let mut obj_canvas = Canvas::from_image(ctx, objects_image.clone(), None);
@@ -157,6 +161,7 @@ impl MapAsset {
 
     fn load_image(&mut self, x: i32, y: i32, idx: usize, back_canvas: &mut Canvas, sm_canvas: &mut Canvas, obj_canvas: &mut Canvas, ctx: &mut Context) {
         let tile = &self.map_info.tiles[idx];
+        let ann = tile.frame > 0;
         let back = tile.back;
         let middle = tile.middle;
         let objects = tile.objects;
@@ -171,8 +176,11 @@ impl MapAsset {
             self.draw_image(x, y, "smTiles", 0, (middle as u32 & 0x7FFF) - 1, sm_canvas, ctx);
         }
         if objects & 0x7FFF > 0 {
+            if !ann {
+                self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) - 1, obj_canvas, ctx);
+            }
             // debug!("objects: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
-            self.draw_image(x, y, "objects", file_idx, (objects as u32 & 0x7FFF) - 1, obj_canvas, ctx);
+
         }
     }
 
@@ -186,7 +194,7 @@ impl MapAsset {
                 let dest = vec2(x as f32 * 48., y as f32 * 32.0 + 32.0 - image.height as f32);
                 debug!("image: x:{}, y:{}, name:{}, idx: {}, offsetX: {}, offsetY: {}, w: {}, h: {}", x, y, name, image_idx, x as f32 * 48., y as f32 * 32.0 + 32.0 - image.height as f32, image.width, image.height);
                 canvas.draw(&img, DrawParam::new().dest(dest));
-                canvas.draw(Text::new(format!("i:{}", image_idx)).set_scale(20.0), dest);
+                // canvas.draw(Text::new(format!("i:{}", image_idx)).set_scale(20.0), dest);
             }
         }
     }

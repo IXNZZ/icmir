@@ -10,14 +10,16 @@ use crate::asset::MapAsset;
 
 pub struct App {
     map_asset: asset::MapAsset,
-    reload_map: bool
+    reload_map: bool,
+    point_x: u32,
+    point_y: u32,
 }
 
 impl App {
 
     pub fn new(ctx: &mut Context) -> Self {
         ctx.gfx.set_resizable(false).unwrap();
-        ctx.gfx.set_drawable_size(1920.0, 1080.0).unwrap();
+        ctx.gfx.set_drawable_size(1920.0, 1280.0).unwrap();
         let mut layer = ggez::graphics::ScreenImage::new(ctx, None, 1.0, 1.0, 1);
         // let mut canvas = ggez::graphics::Canvas::from_image(ctx, layer.image(ctx), None);
         let image = layer.image(ctx);
@@ -31,20 +33,24 @@ impl App {
         // file::data::load_image("/Users/vinter/Dev/Mir2/data/objects.wzl", 3427657, 3436955);
         // file::data::load_image("/Users/vinter/Dev/Mir2/data/objects.wzl", 3427657, 3427657 + 16);
 
-        Self {map_asset: MapAsset::new("/Users/vinter/Dev/Mir2/", "map/0.map", 1920, 1080), reload_map: false}
+        Self {map_asset: MapAsset::new("/Users/vt/Documents/LegendOfMir/", "map/0.map", 1920, 1280),
+            reload_map: false, point_x: 330, point_y: 270}
     }
 }
 
 impl EventHandler<ggez::GameError> for App {
-    fn update(&mut self, _ctx: &mut Context) -> GameResult {
-
+    fn update(&mut self, ctx: &mut Context) -> GameResult {
+        if ctx.time.ticks() % 100 == 0 {
+            println!("Delta frame time: {:?} ", ctx.time.delta());
+            println!("Average FPS: {}", ctx.time.fps());
+        }
         Ok(())
     }
 
     fn draw(&mut self, _ctx: &mut Context) -> GameResult {
-        let mut canvas = Canvas::from_frame(_ctx, Color::new(0.1, 0.2, 0.3, 1.0));
+        let mut canvas = Canvas::from_frame(_ctx, Color::new(0., 0., 0., 1.0));
         if self.reload_map {
-            self.map_asset.reload("map/0.map", 300, 500, _ctx);
+            self.map_asset.reload("map/0.map", self.point_x, self.point_y, _ctx);
             self.reload_map = false;
         }
 
@@ -55,7 +61,7 @@ impl EventHandler<ggez::GameError> for App {
         if let Some(image) = &self.map_asset.sm_image {
             canvas.draw(image, DrawParam::new().dest(vec2(0.0, 0.0)));
         }
-        // // canvas.set_blend_mode(BlendMode::ADD);
+        canvas.set_blend_mode(BlendMode::ADD);
         if let Some(image) = &self.map_asset.obj_image {
             canvas.draw(image, DrawParam::new().dest(vec2(0.0, 0.0)));
         }
@@ -71,6 +77,12 @@ impl EventHandler<ggez::GameError> for App {
         // let mut canvas = Canvas::from_frame(_ctx, None);
         // let param = DrawParam::new().dest(vec2(50.0, 1.0));
         // canvas.draw(&image, param);
+        _ctx.gfx.set_window_title(&format!(
+            "Map Browser - {:.0} FPS, {}X{}",
+            _ctx.time.fps(),
+            self.point_x,
+            self.point_y,
+        ));
         canvas.finish(_ctx).unwrap();
         Ok(())
     }
@@ -78,15 +90,38 @@ impl EventHandler<ggez::GameError> for App {
     fn key_down_event(&mut self, ctx: &mut Context, input: KeyInput, _repeated: bool) -> Result<(), GameError> {
 
         if let Some(x) = input.keycode {
-            if x == VirtualKeyCode::S {
-                println!("key S...");
-                self.reload_map = true;
-                // self.map_asset.reload("map/0.map", 0, 0, ctx);
-                // let raw = RgbaImage::from_raw(image.width(), image.height(), image.to_pixels(ctx).unwrap());
-                // if let Some(x) = raw {
-                //     x.save("/Users/vinter/Dev/raw.png");
-                // }
+            match x {
+                VirtualKeyCode::R => {
+                    self.reload_map = true;
+                }
+                VirtualKeyCode::Left => {
+                    self.point_x -= 1;
+                    self.reload_map = true;
+                }
+                VirtualKeyCode::Up => {
+                    self.point_y -= 1;
+                    self.reload_map = true;
+                }
+                VirtualKeyCode::Right => {
+                    self.point_x += 1;
+                    self.reload_map = true;
+                }
+                VirtualKeyCode::Down => {
+                    self.point_y += 1;
+                    self.reload_map = true;
+                }
+                VirtualKeyCode::Escape => {
+                    ctx.quit_requested = true;
+                }
+                _ => {
+
+                }
             }
+        }
+
+        match input.keycode {
+            None => {}
+            Some(_) => {}
         }
 
         Ok(())
