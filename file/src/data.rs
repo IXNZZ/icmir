@@ -56,9 +56,9 @@ impl ImageData {
         if length == 0 {
             Self { width, height, offset_x, offset_y, bytes: Bytes::new() }
         } else {
+            debug!("S3 length: {}, w: {}, h: {}, pixel: {}", length, width, height, pixel);
             let x = deflate_image(data, width as u32 * height as u32);
             let data = byte_to_rgb(pixel, width as usize, height as usize, &x[..]);
-            debug!("S3 length: {}, w: {}, h: {}, pixel: {}, x: {}, bytes: {}", length, width, height, pixel, x.len(), data.len());
             Self { width, height, offset_x, offset_y, bytes: Bytes::from(data) }
         }
     }
@@ -76,6 +76,7 @@ pub fn load_image(path: &str, start: u32, end: u32) -> ImageData {
         let x = x.get_u32_le();
         if x > 0 {
             let mut i = vec![0; x as usize];
+            reader.seek(SeekFrom::Start(start as u64 + 16)).unwrap();
             reader.read(&mut i[..]).unwrap();
             return ImageData::from_head_data(&data[..], &i[..]);
         }
@@ -89,8 +90,8 @@ pub fn load_index(path: &str) -> Vec<u32> {
     let len = file.metadata().unwrap().len();
     let mut data = Vec::with_capacity(len as usize);
     file.read_to_end(&mut data).unwrap();
-    let mut data = &data[..];
-    let mut result = Vec::with_capacity(len as usize / 4);
+    let mut data = &data[48..];
+    let mut result = Vec::with_capacity(len as usize / 4 - 12);
     let len = data.len() / 4;
     for _ in 0..len {
         result.push(data.get_u32_le());
@@ -104,6 +105,7 @@ fn deflate_image(input: &[u8], size: u32) -> Vec<u8> {
     let status = flate2::Decompress::new(true).decompress_vec(input, &mut rs, FlushDecompress::Finish).unwrap();
     if status != Status::StreamEnd {
         warn!("input: {}, output: {}, status: {:?}, size: {}, size*2: {}", input.len(), rs.len(), status, size, size *2);
+        // return deflate_image(input, size * 2);
     }
     rs
 }
@@ -124,7 +126,7 @@ fn byte_to_rgb(pixel: u8, width: usize, height: usize, bytes: &[u8]) -> Vec<u8> 
                 result.push(c.2);
                 result.push(c.1);
                 result.push(c.0);
-                result.push(255);
+                result.push(if x == 0 {0} else { 255 });
             }
         }
         return result;
@@ -137,10 +139,13 @@ fn byte_to_rgb(pixel: u8, width: usize, height: usize, bytes: &[u8]) -> Vec<u8> 
         for i in 0..height {
             for j in 0..width {
                 let p = (height - i - 1) * n_width * 2 + j * 2;
-                result.push(bytes[p + 1] & 0xF8);
-                result.push((((bytes[p + 1] & 0x7) << 3) | (bytes[p] >> 5)) * 4);
-                result.push((bytes[p] & 0x1F) * 8);
-                result.push(255);
+                let r = bytes[p + 1] & 0xF8;
+                let g = (((bytes[p + 1] & 0x7) << 3) | (bytes[p] >> 5)) * 4;
+                let b = (bytes[p] & 0x1F) * 8;
+                result.push(r);
+                result.push(g);
+                result.push(b);
+                result.push(if r + g + b == 0 { 0 } else { 255 });
             }
         }
         return result;

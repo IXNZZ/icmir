@@ -5,6 +5,7 @@ use std::path::Path;
 use bytes::Buf;
 
 pub fn read_map_file(path: &str) -> MapInfo {
+    println!("read_map_file: {}", path);
     let path = Path::new(path);
     let name = path.file_name().unwrap().to_str().unwrap().to_string();
     let file_size = path.metadata().unwrap().len();
