@@ -118,16 +118,18 @@ impl MapAsset {
         // let start_x = if x > self.map_info.width { self.map_info.width } else { x };
         // let start_y = if y > self.map_info.height { self.map_info.height } else { y };
 
-        let start_x = start_x as i32 - self.max_x_tile as i32 / 2;
+        let start_x = start_x as i32 - self.max_x_tile as i32 / 2 + 1;
         let start_y = start_y as i32 - self.max_y_tile as i32 / 2;
 
         let end_x = start_x + self.max_x_tile as i32;
         let end_y = start_y + self.max_y_tile as i32 + 10;
 
-        let mut screen_image = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
-        let back_image = screen_image.image(ctx);
-        let middle_image = screen_image.image(ctx);
-        let objects_image = screen_image.image(ctx);
+        // let mut tile_screen = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
+        // let mut middle_screen = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
+        let mut objects_screen = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
+        let back_image = objects_screen.image(ctx);
+        let middle_image = objects_screen.image(ctx);
+        let objects_image = objects_screen.image(ctx);
         let mut back_canvas = Canvas::from_image(ctx, back_image.clone(), None);
         let mut sm_canvas = Canvas::from_image(ctx, middle_image.clone(), None);
         let mut obj_canvas = Canvas::from_image(ctx, objects_image.clone(), None);
@@ -150,17 +152,26 @@ impl MapAsset {
                     || y + start_y < 0
                     || x + start_x >= self.map_info.width as i32
                     || y + start_y >= self.map_info.height as i32 { continue }
-                self.load_image(x, y, idx as usize, &mut back_canvas, &mut sm_canvas, &mut obj_canvas, ctx);
+                self.load_image(x - 1, y, idx as usize, &mut back_canvas, &mut sm_canvas, &mut obj_canvas, ctx);
             }
         }
+        {
+            back_canvas.finish(ctx).unwrap();
+            sm_canvas.finish(ctx).unwrap();
+            obj_canvas.finish(ctx).unwrap();
+        }
 
-        back_canvas.finish(ctx).unwrap();
-        sm_canvas.finish(ctx).unwrap();
-        obj_canvas.finish(ctx).unwrap();
+        let obj_screen = ScreenImage::new(ctx, None, 1.0, 1.0, 1).image(ctx);
+        let mut objects_canvas = Canvas::from_image(ctx, obj_screen.clone(), None);
+        // objects_canvas.draw(&back_image, DrawParam::new().dest(vec2(0.0, 0.0)));
+        // objects_canvas.draw(&middle_image, DrawParam::new().dest(vec2(0.0, 0.0)));
+        objects_canvas.draw(&objects_image, DrawParam::new().dest(vec2(0.0, 0.0)));
 
-        self.back_image = Some(back_image);
-        self.sm_image = Some(middle_image);
-        self.obj_image = Some(objects_image);
+        objects_canvas.finish(ctx).unwrap();
+
+        // self.back_image = Some(back_image);
+        // self.sm_image = Some(middle_image);
+        self.obj_image = Some(obj_screen);
     }
 
     fn load_image(&mut self, x: i32, y: i32, idx: usize, back_canvas: &mut Canvas, sm_canvas: &mut Canvas, obj_canvas: &mut Canvas, ctx: &mut Context) {
@@ -193,13 +204,13 @@ impl MapAsset {
             // }
         }
         if objects & 0x7FFF > 0 {
-            let file_idx = if tile.file_idx > 0 { tile.file_idx + 1 } else { 0};
+            let file_idx = if tile.file_idx > 0 && tile.file_idx < 255 { tile.file_idx + 1 } else { 0};
             // let file_idx = if file_idx > 10 && file_idx <= 19 {file_idx - 1} else { file_idx };
             self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) -1, obj_canvas, ctx);
             if !ann  {
                 // debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
             } else {
-                debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
+                // debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
             }
             // debug!("objects: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
 
@@ -216,7 +227,7 @@ impl MapAsset {
                 let dest = vec2(x as f32 * 48., y as f32 * 32.0 - image.height as f32);
                 // debug!("image: x:{}, y:{}, name:{}, idx: {}, offsetX: {}, offsetY: {}, w: {}, h: {}", x, y, name, image_idx, x as f32 * 48., y as f32 * 32.0 + 32.0 - image.height as f32, image.width, image.height);
                 canvas.draw(&img, DrawParam::new().dest(dest));
-                canvas.draw(Text::new(format!(":{}\n{}", image_idx, file_idx)).set_scale(14.0), dest);
+                // canvas.draw(Text::new(format!(":{}\n{}", image_idx, file_idx)).set_scale(14.0), dest);
             }
         }
     }

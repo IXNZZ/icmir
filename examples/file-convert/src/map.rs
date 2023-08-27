@@ -1,9 +1,13 @@
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
 use bytes::Buf;
+use image::DynamicImage::ImageRgb8;
+use image::{DynamicImage, RgbaImage};
+use file::data::ImageData;
 use file::map;
+use file::map::MapInfo;
 use crate::config;
 
 pub fn check_map() {
@@ -81,4 +85,164 @@ pub fn test_map() {
 pub fn println_hex(src: &[u8], length: usize, idx: u32) {
     println!("{}===>{:02X?}", idx, src)
 }
+
+
+
+pub struct MapAsset {
+    pub base_dir: String,
+    pub image: ImageAsset,
+}
+
+pub struct ImageAsset {
+    dir: String,
+    pub image: HashMap<u64, ImageData>,
+    pub index: HashMap<String, Vec<u32>>,
+}
+
+impl ImageAsset {
+
+    pub fn new(dir: &str) -> Self {
+        Self {dir: dir.to_string(), image: HashMap::new(), index: HashMap::new()}
+    }
+    pub fn load_image_asset(&mut self, name: &str, file: u8, idx: u32) -> Option<&ImageData> {
+        let key = self.convert_file_name(self.dir.as_str(), name, file, "wzx");
+        let f = self.convert_file_name(self.dir.as_str(), name, file, "wzl");
+
+        if !self.index.contains_key(&key) {
+            let index = file::data::read_wzx(key.as_str());
+            self.index.insert(key.clone(), index);
+        }
+        if let Some(index) = self.index.get(key.as_str()) {
+            if idx as usize >= index.len() {
+                // warn!("idx:{}, len: {}, key: {}", idx, index.len(), key);
+                return None;
+            }
+            let i = index[idx as usize];
+            let h = name.as_bytes()[0] as u64;
+            let c = file as u64;
+            let k = h << 40 | c << 32 | i as u64;
+            if !self.image.contains_key(&k) {
+                // debug!("image:{} idx: {}, file: {}, key: {}", idx, i, f, key);
+                let image_data = file::data::load_image(f.as_str(), i, i + 16);
+                self.image.insert(k, image_data);
+                // return Some(image_data);
+                //self.image.insert(key.clone(), image_data);
+            }
+            return self.image.get(&k);
+        }
+
+        None
+    }
+
+    fn convert_file_name(&self, dir: &str, name: &str, file: u8, suffix: &str) -> String {
+        if file <= 1 {
+            format!("{}{}.{}", dir, name, suffix)
+        } else {
+            format!("{}{}{}.{}", dir, name, file, suffix)
+        }
+    }
+}
+
+impl MapAsset {
+    pub fn new(dir: &str) -> Self {
+        let mut this = Self {
+            base_dir: String::from(dir.to_string()),
+            image: ImageAsset::new(String::from(dir.to_string() + "/data/").as_str()),
+        };
+
+        this
+    }
+
+
+    pub fn save(&mut self, name: &str) {
+
+        let map_info = file::map::read_map_file(String::from(self.base_dir.clone() + "/map/" + name).as_str());
+
+        let start_x = 0;
+        let start_y = 0;
+        let end_x = start_x + map_info.width as i32;
+        let end_y = start_y + map_info.height as i32;
+
+        let x_point = end_x - start_x;
+        let y_point = end_y - start_y;
+        let mut rgba_image = RgbaImage::new(map_info.width * 48, map_info.height * 32);
+        println!("startX: {}, startY: {}, endX: {}, endY: {}, pointX: {}, pointY: {}", start_x, start_y, end_x, end_y, x_point, y_point);
+        for x in 0..x_point {
+            for y in 0..y_point {
+                let idx = x * map_info.height as i32 + y;
+                if x + start_x < 0
+                    || y + start_y < 0
+                    || x + start_x >= map_info.width as i32
+                    || y + start_y >= map_info.height as i32 { continue }
+                self.load_image(x, y, idx as usize, &map_info, &mut rgba_image);
+            }
+        }
+        // let output = self.base_dir.clone() + "/save/" + name + ".webp";
+        let output = format!("{}/save/{}_{}_{}", self.base_dir, name, map_info.width, map_info.height);
+        let output = if end_x > 340 || end_y > 510 { format!("{}.png", output) } else { format!("{}.webp", output) };
+        println!("output: {}", output);
+        // File::create(output.as_str()).unwrap();
+        rgba_image.save(output).unwrap();
+    }
+
+    fn load_image(&mut self, x: i32, y: i32, idx: usize, map_info: &MapInfo, rgba: &mut RgbaImage) {
+        let tile = &map_info.tiles[idx];
+        let back = tile.back;
+        let middle = tile.middle;
+        let objects = tile.objects;
+
+        if back & 0x7FFF > 0 && idx & 0x01 != 1 && (idx / map_info.height as usize) & 0x01 != 1 {
+            let tile_idx = if tile.tile_idx != 0 { tile.tile_idx + 1 } else { 0 };
+
+            self.draw_image(x, y + 1, "tiles", tile_idx, (back as u32 & 0x7FFF) - 1, rgba);
+        }
+        if middle & 0x7FFF > 0 {
+
+            let middle = (middle as u32 & 0x7FFF) - 1;
+            let middle_idx = if tile.middle_idx != 0 { tile.middle_idx + 1 } else { 0 };
+
+            // debug!("middle: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
+            self.draw_image(x, y, "smTiles", middle_idx, middle, rgba);
+            // }
+        }
+        if objects & 0x7FFF > 0 {
+            let file_idx = if tile.file_idx > 0 && tile.file_idx < 255 { tile.file_idx + 1 } else { 0};
+            // let file_idx = if file_idx > 10 && file_idx <= 19 {file_idx - 1} else { file_idx };
+            if tile.frame == 0  {
+                self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) -1, rgba);
+                // debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
+            }
+            // debug!("objects: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
+
+        }
+    }
+
+    fn draw_image(&mut self, x: i32, y: i32, name: &str, file_idx: u8, image_idx: u32, dest: &mut RgbaImage) {
+        if let Some(image) = self.image.load_image_asset(name, file_idx, image_idx) {
+            if image.bytes.len() > 0 {
+                if let Some(rgb) = RgbaImage::from_raw(image.width as u32, image.height as u32, image.bytes.to_vec()) {
+                    // println!("x: {}, y: {}", x as i64 * 48, y as i64 * 32 - image.height as i64);
+                    image::imageops::overlay(dest, &rgb, x as i64 * 48, y as i64 * 32 - image.height as i64)
+                    // image::imageops::overlay()
+                }
+
+                // dest.
+                // RgbaImage::from_pixel(image.width as u32, image.height as u32)
+                // let img = Image::from_pixels(ctx, &image.bytes[..],
+                //                              ImageFormat::Rgba8UnormSrgb,
+                //                              image.width as u32,
+                //                              image.height as u32);
+                // let dest = vec2(x as f32 * 48., y as f32 * 32.0 - image.height as f32);
+                // // debug!("image: x:{}, y:{}, name:{}, idx: {}, offsetX: {}, offsetY: {}, w: {}, h: {}", x, y, name, image_idx, x as f32 * 48., y as f32 * 32.0 + 32.0 - image.height as f32, image.width, image.height);
+                // canvas.draw(&img, DrawParam::new().dest(dest));
+                // canvas.draw(Text::new(format!(":{}\n{}", image_idx, file_idx)).set_scale(14.0), dest);
+            }
+        }
+    }
+
+}
+
+
+
+
 

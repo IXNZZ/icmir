@@ -35,7 +35,7 @@ impl App {
         // file::data::load_image("/Users/vinter/Dev/Mir2/data/objects.wzl", 3427657, 3427657 + 16);
 
         Self {map_asset: MapAsset::new("/Users/vt/Documents/LegendOfMir/", "map/0.map", 1920, 1280),
-            reload_map: false, point_x: 328, point_y: 255}
+            reload_map: false, point_x: 20, point_y: 20}
     }
 }
 
@@ -52,7 +52,7 @@ impl EventHandler<ggez::GameError> for App {
     fn draw(&mut self, _ctx: &mut Context) -> GameResult {
         let mut canvas = Canvas::from_frame(_ctx, Color::new(0., 0., 0., 1.0));
         if self.reload_map {
-            self.map_asset.reload("map/n0.map", self.point_x, self.point_y, _ctx);
+            self.map_asset.reload("map/T1404.map", self.point_x, self.point_y, _ctx);
             self.reload_map = false;
         }
 
