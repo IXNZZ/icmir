@@ -6,7 +6,7 @@ use file::map::{MapInfo, Tile};
 use ggez::Context;
 use ggez::glam::vec2;
 use ggez::graphics::{Canvas, Color, DrawParam, Image, ImageFormat, ScreenImage, Text, TextLayout};
-use tracing::debug;
+use tracing::{debug, warn};
 
 pub struct MapAsset {
     pub base_dir: String,
@@ -44,12 +44,16 @@ impl ImageAsset {
                 self.index.insert(key.clone(), index);
             }
             if let Some(index) = self.index.get(key.as_str()) {
+                if idx as usize >= index.len() {
+                    warn!("idx:{}, len: {}, key: {}", idx, index.len(), key);
+                    return None;
+                }
                 let i = index[idx as usize];
                 let h = name.as_bytes()[0] as u64;
                 let c = file as u64;
                 let k = h << 40 | c << 32 | i as u64;
                 if !self.image.contains_key(&k) {
-                    debug!("image:{} idx: {}, file: {}, key: {}", idx, i, f, key);
+                    // debug!("image:{} idx: {}, file: {}, key: {}", idx, i, f, key);
                     let image_data = file::data::load_image(f.as_str(), i, i + 16);
                     self.image.insert(k, image_data);
                     // return Some(image_data);
@@ -118,7 +122,7 @@ impl MapAsset {
         let start_y = start_y as i32 - self.max_y_tile as i32 / 2;
 
         let end_x = start_x + self.max_x_tile as i32;
-        let end_y = start_y + self.max_y_tile as i32 + 1;
+        let end_y = start_y + self.max_y_tile as i32 + 10;
 
         let mut screen_image = ScreenImage::new(ctx, None, 1.0, 1.0, 1);
         let back_image = screen_image.image(ctx);
@@ -160,24 +164,42 @@ impl MapAsset {
     }
 
     fn load_image(&mut self, x: i32, y: i32, idx: usize, back_canvas: &mut Canvas, sm_canvas: &mut Canvas, obj_canvas: &mut Canvas, ctx: &mut Context) {
-        let tile = &self.map_info.tiles[idx];
+        let tile = &self.map_info.tiles[idx].clone();
         let ann = tile.frame > 0;
         let back = tile.back;
         let middle = tile.middle;
         let objects = tile.objects;
-        let file_idx = if tile.file_idx > 0 { tile.file_idx + 1 } else { 0};
-        debug!("back: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
+
+        // debug!("back: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
         if back & 0x7FFF > 0 && idx & 0x01 != 1 && (idx / self.map_info.height as usize) & 0x01 != 1 {
+
+            let tile_idx = if tile.tile_idx != 0 { tile.tile_idx + 1 } else { 0 };
+
             // debug!("back: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
-            self.draw_image(x, y, "tiles", 0, (back as u32 & 0x7FFF) - 1, back_canvas, ctx);
+            self.draw_image(x, y + 1, "tiles", tile_idx, (back as u32 & 0x7FFF) - 1, back_canvas, ctx);
         }
         if middle & 0x7FFF > 0 {
-            // debug!("middle: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
-            self.draw_image(x, y, "smTiles", 0, (middle as u32 & 0x7FFF) - 1, sm_canvas, ctx);
+            // if middle < 50000 {
+
+            let middle = (middle as u32 & 0x7FFF) - 1;
+            // let file_idx = if middle > 5000 && middle < 6000 { 5 } else { 3 };
+            // // let file_idx = if middle > 1000 && middle < 1560 { 4 } else { file_idx };
+            // let file_idx = if middle > 1000 && middle < 4000 { 5 } else { file_idx };
+            // if middle < 1560 && tile.reserved != 0 { 4 }
+            let middle_idx = if tile.middle_idx != 0 { tile.middle_idx + 1 } else { 0 };
+
+            // debug!("middle: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
+            self.draw_image(x, y, "smTiles", middle_idx, middle, sm_canvas, ctx);
+            // }
         }
         if objects & 0x7FFF > 0 {
-            if !ann {
-                self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) - 1, obj_canvas, ctx);
+            let file_idx = if tile.file_idx > 0 { tile.file_idx + 1 } else { 0};
+            // let file_idx = if file_idx > 10 && file_idx <= 19 {file_idx - 1} else { file_idx };
+            self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) -1, obj_canvas, ctx);
+            if !ann  {
+                // debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
+            } else {
+                debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
             }
             // debug!("objects: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
 
@@ -191,10 +213,10 @@ impl MapAsset {
                                              ImageFormat::Rgba8UnormSrgb,
                                              image.width as u32,
                                              image.height as u32);
-                let dest = vec2(x as f32 * 48., y as f32 * 32.0 + 32.0 - image.height as f32);
-                debug!("image: x:{}, y:{}, name:{}, idx: {}, offsetX: {}, offsetY: {}, w: {}, h: {}", x, y, name, image_idx, x as f32 * 48., y as f32 * 32.0 + 32.0 - image.height as f32, image.width, image.height);
+                let dest = vec2(x as f32 * 48., y as f32 * 32.0 - image.height as f32);
+                // debug!("image: x:{}, y:{}, name:{}, idx: {}, offsetX: {}, offsetY: {}, w: {}, h: {}", x, y, name, image_idx, x as f32 * 48., y as f32 * 32.0 + 32.0 - image.height as f32, image.width, image.height);
                 canvas.draw(&img, DrawParam::new().dest(dest));
-                // canvas.draw(Text::new(format!("i:{}", image_idx)).set_scale(20.0), dest);
+                canvas.draw(Text::new(format!(":{}\n{}", image_idx, file_idx)).set_scale(14.0), dest);
             }
         }
     }

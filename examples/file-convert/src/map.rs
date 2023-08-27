@@ -1,5 +1,8 @@
 use std::collections::HashSet;
+use std::fs::File;
+use std::io::Read;
 use std::path::Path;
+use bytes::Buf;
 use file::map;
 use crate::config;
 
@@ -49,5 +52,33 @@ pub fn check_map() {
 pub fn load_wzx(name: &str) -> Vec<u32> {
     let path = Path::new(config::BASE_DIR).join(config::DATA_DIR_NAME).join(name.to_string() + ".wzx");
     crate::data::read_wzx(path.to_str().unwrap())
+}
+
+pub fn test_map() {
+    let path = Path::new(config::BASE_DIR).join(config::MAP_DIR_NAME).join( "n0.map");
+    let name = path.file_name().unwrap().to_str().unwrap().to_string();
+    let file_size = path.metadata().unwrap().len();
+    let mut file = File::open(path).unwrap();
+    let mut header = [0u8; 52];
+    file.read(&mut header).unwrap();
+    let mut header = &header[..];
+    let width = header.get_u16_le() as u32;
+    let height = header.get_u16_le() as u32;
+    let length = ((file_size as u32 - 52) / (width * height)) as usize;
+    let mut body = Vec::with_capacity(file_size as usize -52);
+    file.read_to_end(&mut body).unwrap();
+    // let mut reader = BufReader::new(file);
+    // let mut tiles = Vec::with_capacity((width * height) as usize);
+    for i in 187921..189000 {
+        let start = i as usize * length;
+        let end = start + length;
+        // let tile = Tile::from(&body[start..end]);
+        // tiles.push(tile);
+        println_hex(&body[start..end], length, i);
+    }
+}
+
+pub fn println_hex(src: &[u8], length: usize, idx: u32) {
+    println!("{}===>{:02X?}", idx, src)
 }
 

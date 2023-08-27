@@ -5,6 +5,7 @@ use ggez::graphics::{BlendMode, Canvas, Color, DrawMode, DrawParam, Rect, Screen
 use ggez::input::keyboard::KeyInput;
 use ggez::winit::event::VirtualKeyCode;
 use image::{DynamicImage, RgbaImage};
+use tracing::debug;
 use crate::asset;
 use crate::asset::MapAsset;
 
@@ -34,24 +35,29 @@ impl App {
         // file::data::load_image("/Users/vinter/Dev/Mir2/data/objects.wzl", 3427657, 3427657 + 16);
 
         Self {map_asset: MapAsset::new("/Users/vt/Documents/LegendOfMir/", "map/0.map", 1920, 1280),
-            reload_map: false, point_x: 330, point_y: 270}
+            reload_map: false, point_x: 328, point_y: 255}
     }
 }
 
 impl EventHandler<ggez::GameError> for App {
     fn update(&mut self, ctx: &mut Context) -> GameResult {
-        if ctx.time.ticks() % 100 == 0 {
-            println!("Delta frame time: {:?} ", ctx.time.delta());
-            println!("Average FPS: {}", ctx.time.fps());
-        }
+        // if ctx.time.ticks() % 100 == 0 {
+        //     println!("Delta frame time: {:?} ", ctx.time.delta());
+        //     println!("Average FPS: {}", ctx.time.fps());
+        //     debug!("Average ticks: {}", ctx.time.ticks());
+        // }
         Ok(())
     }
 
     fn draw(&mut self, _ctx: &mut Context) -> GameResult {
         let mut canvas = Canvas::from_frame(_ctx, Color::new(0., 0., 0., 1.0));
         if self.reload_map {
-            self.map_asset.reload("map/0.map", self.point_x, self.point_y, _ctx);
+            self.map_asset.reload("map/n0.map", self.point_x, self.point_y, _ctx);
             self.reload_map = false;
+        }
+
+        if _ctx.time.ticks() % 2 == 0 {
+            // return Ok(());
         }
 
         if let Some(image) = &self.map_asset.back_image {
@@ -61,7 +67,7 @@ impl EventHandler<ggez::GameError> for App {
         if let Some(image) = &self.map_asset.sm_image {
             canvas.draw(image, DrawParam::new().dest(vec2(0.0, 0.0)));
         }
-        canvas.set_blend_mode(BlendMode::ADD);
+        // canvas.set_blend_mode(BlendMode::ADD);
         if let Some(image) = &self.map_asset.obj_image {
             canvas.draw(image, DrawParam::new().dest(vec2(0.0, 0.0)));
         }

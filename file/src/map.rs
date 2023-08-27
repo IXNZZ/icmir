@@ -38,7 +38,7 @@ pub struct MapInfo {
     pub tiles: Vec<Tile>
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Tile {
     pub back: u16,
     pub middle: u16,
@@ -49,7 +49,8 @@ pub struct Tile {
     pub tick: u8,
     pub file_idx: u8,
     pub light: u8,
-    pub reserved: u8,
+    pub tile_idx: u8,
+    pub middle_idx: u8,
 }
 
 impl Tile {
@@ -65,10 +66,19 @@ impl Tile {
         let tick = bytes.get_u8();
         let file_idx = bytes.get_u8();
         let light = bytes.get_u8();
-        let mut reserved = 0;
-        if len > 12 {
-            reserved = bytes.get_u8();
-        }
-        Tile { back, middle, objects, door_idx, door_offset, frame, tick, file_idx, light, reserved }
+        let tile_idx = if len > 12 { bytes.get_u8() } else { 0 };
+        let middle_idx = if len > 13 { bytes.get_u8() } else { 0 };
+        // if len == 36 {
+        //     let x = &bytes[..];
+        //     // println!("x.len: {}", x.len());
+        //     for i in 0..x.len() {
+        //         if bytes[i] != 0 {
+        //             println!("xxxxxxx:{}, {:02X?}", i, x);
+        //             break;
+        //         }
+        //     }
+        // }
+
+        Tile { back, middle, objects, door_idx, door_offset, frame, tick, file_idx, light, tile_idx, middle_idx }
     }
 }

@@ -7,4 +7,5 @@ fn main() {
 
     // data::convert_data();
     map::check_map();
+    // map::test_map();
 }
