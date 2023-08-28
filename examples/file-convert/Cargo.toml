@@ -10,3 +10,6 @@ bytes = "1.4.0"
 file = { path = "../../file" }
 image = {version = "0.24.6", features = ["default", "webp-encoder"] }
 libwebp-sys = { version = "0.9", features = ["parallel", "neon"] }
+threadpool = "1.8.1"
+tokio = {version = "1.28.1", features = ["full"] }
+chrono = "0.4.24"

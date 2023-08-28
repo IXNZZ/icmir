@@ -2,6 +2,7 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::sync::Arc;
 use std::time::Instant;
 use bytes::Buf;
 use image::{RgbaImage};
@@ -9,6 +10,7 @@ use file::data::ImageData;
 use file::map;
 use file::map::MapInfo;
 use image::imageops::FilterType;
+use tokio::sync::Semaphore;
 use crate::config;
 
 pub fn check_map() {
@@ -91,7 +93,7 @@ pub fn println_hex(src: &[u8], length: usize, idx: u32) {
 
 pub struct MapAsset {
     pub base_dir: String,
-    pub image: ImageAsset,
+    pub image: ImageAsset
 }
 
 pub struct ImageAsset {
@@ -148,41 +150,44 @@ impl MapAsset {
     pub fn new(dir: &str) -> Self {
         let mut this = Self {
             base_dir: String::from(dir.to_string()),
-            image: ImageAsset::new(String::from(dir.to_string() + "/data/").as_str()),
+            image: ImageAsset::new(String::from(dir.to_string() + "/data/").as_str())
         };
 
         this
     }
 
-    pub fn save_all(&mut self) {
-        let dir = Path::new(self.base_dir.as_str()).join(config::MAP_DIR_NAME).read_dir().unwrap();
-        let data_dir = self.base_dir.clone() + "/data/";
+    pub async fn save_all() {
+        let dir = Path::new(config::BASE_DIR).join(config::MAP_DIR_NAME).read_dir().unwrap();
+        let data_dir = config::BASE_DIR.to_string() + "/data/";
         let mut files:Vec<String> = dir.map(|x| {
             String::from(x.unwrap().path().to_str().unwrap())
         }).filter(|x| { x.ends_with(".map") }).collect();
         files.sort();
-        for file in &files {
-            let info = map::read_map_file(file);
-            if info.width > 340 || info.height > 510 {
-                eprintln!("Ignore file: {}, {}X{}", file, info.width, info.height);
-            } else {
-                self.save_info(info);
-                let images = self.image.image.len();
-                // println!("image cache: {}", images);
-                self.image = ImageAsset::new(data_dir.as_str());
-            }
-
+        let semaphore = Arc::new(Semaphore::new(4));
+        for file in files {
+            let semaphore = semaphore.clone();
+            // let _permit = semaphore.acquire_owned().await.unwrap();
+            // tokio::spawn(async move {
+                let info = map::read_map_file(file.as_str());
+                MapAsset::new(config::BASE_DIR).save_info(info, semaphore).await;
+                // if info.width > 340 || info.height > 510 {
+                //     // eprintln!("Ignore file: {}, {}X{}", file, info.width, info.height);
+                // } else {
+                //     MapAsset::new(config::BASE_DIR).save_info(info, semaphore).await;
+                // }
+                // drop(_permit);
+            // });
         }
 
     }
 
 
-    pub fn save(&mut self, name: &str) {
+    pub async fn save(&mut self, name: &str, semaphore: Arc<Semaphore>) {
         let map_info = file::map::read_map_file(String::from(self.base_dir.clone() + "/map/" + name).as_str());
-        self.save_info(map_info);
+        self.save_info(map_info, semaphore).await;
     }
 
-    pub fn save_info(&mut self, map_info: MapInfo) {
+    pub async fn save_info(&mut self, map_info: MapInfo, semaphore: Arc<Semaphore>) {
         let now = Instant::now();
         // let map_info = file::map::read_map_file(String::from(self.base_dir.clone() + "/map/" + name).as_str());
 
@@ -194,7 +199,7 @@ impl MapAsset {
         let x_point = end_x - start_x;
         let y_point = end_y - start_y;
         let mut rgba_image = RgbaImage::new(map_info.width * 48, map_info.height * 32);
-        println!("startX: {}, startY: {}, endX: {}, endY: {}, now: {:?}", start_x, start_y, end_x, end_y, now.elapsed().as_millis());
+        // println!("startX: {}, startY: {}, endX: {}, endY: {}, now: {:?}", start_x, start_y, end_x, end_y, now.elapsed().as_millis());
         for x in 0..x_point {
             for y in 0..y_point {
                 let idx = x * map_info.height as i32 + y;
@@ -208,24 +213,32 @@ impl MapAsset {
         // let output = self.base_dir.clone() + "/save/" + name + ".webp";
         let output = format!("{}/save/{}_{}_{}.webp", self.base_dir, map_info.name, map_info.width, map_info.height);
         // let output = if end_x > 340 || end_y > 510 { format!("{}.png", output) } else { format!("{}.webp", output) };
-        println!("load image now: {:?}, output: {}", now.elapsed().as_millis(), output);
+        println!("load image now: {:04?}, output: {}", now.elapsed().as_millis(), output);
+        let permit = semaphore.acquire_owned().await.unwrap();
+        tokio::spawn(async move{
+            let now = Instant::now();
+            MapAsset::save_image(rgba_image, map_info.width * 48, map_info.height * 32, output.as_str());
+            println!("save finish: {}, map: {:?}", map_info.name, now.elapsed().as_millis());
+            drop(permit);
+        });
 
-        self.save_image(&rgba_image, map_info.width * 48, map_info.height * 32, output.as_str());
 
-        println!("save finish: {:?}, cache: {}", now.elapsed().as_millis(), self.image.image.len());
+        // MapAsset::save_image(rgba_image, map_info.width * 48, map_info.height * 32, output.as_str());
+
+        // println!("save finish: {:?}", now.elapsed().as_millis());
     }
 
-    fn save_image(&self, image: &RgbaImage, width: u32, height: u32, output: &str) {
+    fn save_image(image: RgbaImage, width: u32, height: u32, output: &str) {
         if width >= 0x3FFF || height >= 0x3FFF {
-            self.save_image(image, width / 2, height / 2, output);
+            MapAsset::save_image(image, width / 2, height / 2, output);
             return;
         }
         if image.width() != width || image.height() != height {
             let now = Instant::now();
-            let dest = image::imageops::resize(image, width, height, FilterType::Triangle);
+            let dest = image::imageops::resize(&image, width, height, FilterType::Triangle);
             println!("resize image: {}X{} now:{:?}", dest.width(), dest.height(), now.elapsed().as_millis());
             dest.save(output).unwrap();
-
+            // libwebp_sys::WebEn
         } else {
             image.save(output).unwrap();
         }
