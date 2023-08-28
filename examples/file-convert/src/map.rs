@@ -163,7 +163,7 @@ impl MapAsset {
             String::from(x.unwrap().path().to_str().unwrap())
         }).filter(|x| { x.ends_with(".map") }).collect();
         files.sort();
-        let semaphore = Arc::new(Semaphore::new(4));
+        let semaphore = Arc::new(Semaphore::new(2));
         for file in files {
             let semaphore = semaphore.clone();
             // let _permit = semaphore.acquire_owned().await.unwrap();
@@ -171,7 +171,11 @@ impl MapAsset {
             let info = map::read_map_file(file.as_str());
             let output = format!("{}/save/{}_{}_{}.webp", config::BASE_DIR, info.name, info.width, info.height);
             if !Path::new(&output).exists() {
-                MapAsset::new(config::BASE_DIR).save_info(info, semaphore).await;
+                // if info.width <= 300 && info.height <= 300 {
+                    println!("read file: {}", file);
+                    MapAsset::new(config::BASE_DIR).save_info(info, semaphore).await;
+                // }
+                // MapAsset::new(config::BASE_DIR).save_info(info, semaphore).await;
             } else {
                 println!("file exists: {}", output);
             }
@@ -257,21 +261,21 @@ impl MapAsset {
         let objects = tile.objects;
 
         if back & 0x7FFF > 0 && idx & 0x01 != 1 && (idx / map_info.height as usize) & 0x01 != 1 {
-            let tile_idx = if tile.tile_idx != 0 { tile.tile_idx + 1 } else { 0 };
+            let tile_idx = if tile.tile_idx != 0 && tile.tile_idx < 22 { tile.tile_idx + 1 } else { 0 };
 
             self.draw_image(x, y + 1, "tiles", tile_idx, (back as u32 & 0x7FFF) - 1, rgba);
         }
         if middle & 0x7FFF > 0 {
 
             let middle = (middle as u32 & 0x7FFF) - 1;
-            let middle_idx = if tile.middle_idx != 0 { tile.middle_idx + 1 } else { 0 };
+            let middle_idx = if tile.middle_idx != 0 && tile.middle_idx < 36 { tile.middle_idx + 1 } else { 0 };
 
             // debug!("middle: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
             self.draw_image(x, y, "smTiles", middle_idx, middle, rgba);
             // }
         }
         if objects & 0x7FFF > 0 {
-            let file_idx = if tile.file_idx > 0 && tile.file_idx < 255 { tile.file_idx + 1 } else { 0};
+            let file_idx = if tile.file_idx > 0 && tile.file_idx < 51 { tile.file_idx + 1 } else { 0};
             // let file_idx = if file_idx > 10 && file_idx <= 19 {file_idx - 1} else { file_idx };
             if tile.frame == 0  {
                 self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) -1, rgba);
