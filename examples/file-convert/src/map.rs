@@ -168,8 +168,13 @@ impl MapAsset {
             let semaphore = semaphore.clone();
             // let _permit = semaphore.acquire_owned().await.unwrap();
             // tokio::spawn(async move {
-                let info = map::read_map_file(file.as_str());
+            let info = map::read_map_file(file.as_str());
+            let output = format!("{}/save/{}_{}_{}.webp", config::BASE_DIR, info.name, info.width, info.height);
+            if !Path::new(&output).exists() {
                 MapAsset::new(config::BASE_DIR).save_info(info, semaphore).await;
+            } else {
+                println!("file exists: {}", output);
+            }
                 // if info.width > 340 || info.height > 510 {
                 //     // eprintln!("Ignore file: {}, {}X{}", file, info.width, info.height);
                 // } else {
