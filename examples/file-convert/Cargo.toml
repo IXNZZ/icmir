@@ -9,3 +9,4 @@ edition = "2021"
 bytes = "1.4.0"
 file = { path = "../../file" }
 image = {version = "0.24.6", features = ["default", "webp-encoder"] }
+libwebp-sys = { version = "0.9", features = ["parallel", "neon"] }

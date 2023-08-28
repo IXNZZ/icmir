@@ -2,12 +2,13 @@ use std::collections::{HashMap, HashSet};
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use std::time::Instant;
 use bytes::Buf;
-use image::DynamicImage::ImageRgb8;
-use image::{DynamicImage, RgbaImage};
+use image::{RgbaImage};
 use file::data::ImageData;
 use file::map;
 use file::map::MapInfo;
+use image::imageops::FilterType;
 use crate::config;
 
 pub fn check_map() {
@@ -153,10 +154,37 @@ impl MapAsset {
         this
     }
 
+    pub fn save_all(&mut self) {
+        let dir = Path::new(self.base_dir.as_str()).join(config::MAP_DIR_NAME).read_dir().unwrap();
+        let data_dir = self.base_dir.clone() + "/data/";
+        let mut files:Vec<String> = dir.map(|x| {
+            String::from(x.unwrap().path().to_str().unwrap())
+        }).filter(|x| { x.ends_with(".map") }).collect();
+        files.sort();
+        for file in &files {
+            let info = map::read_map_file(file);
+            if info.width > 340 || info.height > 510 {
+                eprintln!("Ignore file: {}, {}X{}", file, info.width, info.height);
+            } else {
+                self.save_info(info);
+                let images = self.image.image.len();
+                // println!("image cache: {}", images);
+                self.image = ImageAsset::new(data_dir.as_str());
+            }
+
+        }
+
+    }
+
 
     pub fn save(&mut self, name: &str) {
-
         let map_info = file::map::read_map_file(String::from(self.base_dir.clone() + "/map/" + name).as_str());
+        self.save_info(map_info);
+    }
+
+    pub fn save_info(&mut self, map_info: MapInfo) {
+        let now = Instant::now();
+        // let map_info = file::map::read_map_file(String::from(self.base_dir.clone() + "/map/" + name).as_str());
 
         let start_x = 0;
         let start_y = 0;
@@ -166,7 +194,7 @@ impl MapAsset {
         let x_point = end_x - start_x;
         let y_point = end_y - start_y;
         let mut rgba_image = RgbaImage::new(map_info.width * 48, map_info.height * 32);
-        println!("startX: {}, startY: {}, endX: {}, endY: {}, pointX: {}, pointY: {}", start_x, start_y, end_x, end_y, x_point, y_point);
+        println!("startX: {}, startY: {}, endX: {}, endY: {}, now: {:?}", start_x, start_y, end_x, end_y, now.elapsed().as_millis());
         for x in 0..x_point {
             for y in 0..y_point {
                 let idx = x * map_info.height as i32 + y;
@@ -174,15 +202,34 @@ impl MapAsset {
                     || y + start_y < 0
                     || x + start_x >= map_info.width as i32
                     || y + start_y >= map_info.height as i32 { continue }
-                self.load_image(x, y, idx as usize, &map_info, &mut rgba_image);
+                self.load_image(x, y + 1, idx as usize, &map_info, &mut rgba_image);
             }
         }
         // let output = self.base_dir.clone() + "/save/" + name + ".webp";
-        let output = format!("{}/save/{}_{}_{}", self.base_dir, name, map_info.width, map_info.height);
-        let output = if end_x > 340 || end_y > 510 { format!("{}.png", output) } else { format!("{}.webp", output) };
-        println!("output: {}", output);
-        // File::create(output.as_str()).unwrap();
-        rgba_image.save(output).unwrap();
+        let output = format!("{}/save/{}_{}_{}.webp", self.base_dir, map_info.name, map_info.width, map_info.height);
+        // let output = if end_x > 340 || end_y > 510 { format!("{}.png", output) } else { format!("{}.webp", output) };
+        println!("load image now: {:?}, output: {}", now.elapsed().as_millis(), output);
+
+        self.save_image(&rgba_image, map_info.width * 48, map_info.height * 32, output.as_str());
+
+        println!("save finish: {:?}, cache: {}", now.elapsed().as_millis(), self.image.image.len());
+    }
+
+    fn save_image(&self, image: &RgbaImage, width: u32, height: u32, output: &str) {
+        if width >= 0x3FFF || height >= 0x3FFF {
+            self.save_image(image, width / 2, height / 2, output);
+            return;
+        }
+        if image.width() != width || image.height() != height {
+            let now = Instant::now();
+            let dest = image::imageops::resize(image, width, height, FilterType::Triangle);
+            println!("resize image: {}X{} now:{:?}", dest.width(), dest.height(), now.elapsed().as_millis());
+            dest.save(output).unwrap();
+
+        } else {
+            image.save(output).unwrap();
+        }
+
     }
 
     fn load_image(&mut self, x: i32, y: i32, idx: usize, map_info: &MapInfo, rgba: &mut RgbaImage) {

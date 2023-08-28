@@ -10,6 +10,7 @@ fn main() {
     // data::convert_data();
     // map::check_map();
     // map::test_map();
-    let mut map = MapAsset::new(config::BASE_DIR);
-    map.save("ygfx1.map");
+    let mut map = MapAsset::new("/Users/vinter/Dev/Mir2");
+    // map.save("n3.map");
+    map.save_all();
 }
