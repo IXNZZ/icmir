@@ -62,7 +62,7 @@ pub fn load_wzx(name: &str) -> Vec<u32> {
 }
 
 pub fn test_map() {
-    let path = Path::new(config::BASE_DIR).join(config::MAP_DIR_NAME).join( "n0.map");
+    let path = Path::new("/Users/vinter/Dev/Mir2").join(config::MAP_DIR_NAME).join( "EM001.map");
     let name = path.file_name().unwrap().to_str().unwrap().to_string();
     let file_size = path.metadata().unwrap().len();
     let mut file = File::open(path).unwrap();
@@ -76,7 +76,8 @@ pub fn test_map() {
     file.read_to_end(&mut body).unwrap();
     // let mut reader = BufReader::new(file);
     // let mut tiles = Vec::with_capacity((width * height) as usize);
-    for i in 187921..189000 {
+    println!("w: {}, h: {}, length: {}, size: {}", width, height, length, file_size);
+    for i in 0..width * height {
         let start = i as usize * length;
         let end = start + length;
         // let tile = Tile::from(&body[start..end]);
@@ -86,7 +87,7 @@ pub fn test_map() {
 }
 
 pub fn println_hex(src: &[u8], length: usize, idx: u32) {
-    println!("{}===>{:02X?}", idx, src)
+    println!("{}=={}=>{:02X?}", idx, length, src);
 }
 
 

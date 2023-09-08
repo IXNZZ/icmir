@@ -206,11 +206,14 @@ impl MapAsset {
         if objects & 0x7FFF > 0 {
             let file_idx = if tile.file_idx > 0 && tile.file_idx < 255 { tile.file_idx + 1 } else { 0};
             // let file_idx = if file_idx > 10 && file_idx <= 19 {file_idx - 1} else { file_idx };
-            self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) -1, obj_canvas, ctx);
             if !ann  {
+                self.draw_image(x, y, "objects", file_idx , (objects as u32 & 0x7FFF) -1, obj_canvas, ctx);
                 // debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
             } else {
-                // debug!("back: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
+                debug!("ann: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
+            }
+            if tile.door_idx > 0 {
+                debug!("door: x: {:03}, y: {:03}, idx: {:05}, file: {}, {:?}", x, y, idx, file_idx, tile);
             }
             // debug!("objects: x: {:03}, y: {:03}, idx: {:05}, {:?}", x, y, idx, tile);
 

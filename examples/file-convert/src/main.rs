@@ -3,6 +3,8 @@ use crate::map::MapAsset;
 mod data;
 mod config;
 mod map;
+mod cache;
+mod frame;
 
 #[tokio::main(flavor = "multi_thread", worker_threads = 5)]
 async fn main() {
@@ -11,9 +13,11 @@ async fn main() {
     // data::convert_data();
     // map::check_map();
     // map::test_map();
-    // let mut map = MapAsset::new(config::BASE_DIR);
-    // map.save("n4.map").await;
-    MapAsset::save_all().await;
+    // let mut map = MapAsset::new("/Users/vinter/Dev/Mir2");
+    // map.save("EM001.map", Arc::new(Semaphore::new(1))).await;
+    // MapAsset::save_all().await;
+    // frame::test_frame();
+    cache::create_default_image_asset("/Users/vinter/Dev/Mir2");
 }
 
 
