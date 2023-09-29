@@ -6,3 +6,15 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ggez = { version = "0.9.3" }
+bytes = "1"
+tracing = "0.1"
+tracing-subscriber = {version = "0.3", features = ["env-filter"]}
+chrono = "0.4"
+moka = {version = "0.11"}
+keyframe = {version = "1.1"}
+keyframe_derive = {version = "1"}
+crossbeam = "0.8"
+tokio = { version = "1", features = ["full"] }
+winit = "0.28"
+file = {path = "./file"}

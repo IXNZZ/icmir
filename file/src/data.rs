@@ -4,6 +4,7 @@ use std::path::Path;
 use bytes::{Buf, Bytes};
 use flate2::{FlushDecompress, Status};
 use tracing::{debug, info, warn};
+use tracing::field::debug;
 use crate::data::color::PALETTE;
 
 #[derive(Default)]
@@ -57,7 +58,7 @@ impl ImageData {
         if length == 0 {
             Self { width, height, offset_x, offset_y, bytes: Bytes::new() }
         } else {
-            debug!("S3 length: {}, w: {}, h: {}, pixel: {}", length, width, height, pixel);
+            // debug!("S3 length: {}, w: {}, h: {}, pixel: {}", length, width, height, pixel);
             let x = deflate_image(data, width as u32 * height as u32);
             let data = byte_to_rgb(pixel, width as usize, height as usize, &x[..]);
             Self { width, height, offset_x, offset_y, bytes: Bytes::from(data) }
@@ -66,7 +67,7 @@ impl ImageData {
 }
 
 pub fn load_image(path: &str, start: u32, end: u32) -> ImageData {
-    debug!("S1 start: {}, end: {}, len: , path: {}", start, end, path);
+    // debug!("S1 start: {}, end: {}, len: , path: {}", start, end, path);
     let file = File::open(path).unwrap();
     let mut reader = BufReader::new(file);
     let mut data = vec![0;(end - start) as usize];

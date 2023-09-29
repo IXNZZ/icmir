@@ -44,7 +44,7 @@ impl State {
         let x = &self.image_idx[start_idx as usize..end_idx as usize];
         let mut images = Vec::with_capacity(x.len() - 1);
         for i in 0..x.len() - 1 {
-            debug!("idx: {}, {}, {}", i, x[i], x[i+1]);
+            // debug!("idx: {}, {}, {}", i, x[i], x[i+1]);
             let img = file::data::load_image(path.as_str(), x[i], x[i+1]);
             images.push(img);
         }

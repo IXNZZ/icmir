@@ -6,41 +6,9 @@ use std::iter::Map;
 use std::path::{Path, PathBuf};
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::{FlushDecompress, Status};
-use image::EncodableLayout;
 use moka::sync::{Cache, CacheBuilder};
 use tracing::warn;
 
-pub fn test_cache() {
-    // let cache: Cache<u64, Bytes> = CacheBuilder::new(10000).build();
-    test_dir_main();
-}
-
-fn test_dir_main() -> io::Result<()> {
-    let mut entries = fs::read_dir("/Users/vinter/Dev/Mir2/data/")?
-        .map(|res| res.map(|e| e.path()).unwrap()).filter(|x| {
-        println!("{:?}, idx: {:?}", x, x.to_str().unwrap().ends_with(".idx"));
-        x.to_str().unwrap().ends_with(".idx")
-    }).collect::<Vec<PathBuf>>();
-
-    // 不保证 `read_dir` 返回条目的顺序。
-    // 如果需要可重复的排序，则应对条目进行显式排序。
-
-    entries.sort();
-    let mut sum = 0;
-    let count =  entries.len();
-    for entry in entries {
-        let size = entry.metadata().unwrap().len();
-        println!("{:?}, size: {}", entry, size);
-        sum += size;
-    }
-
-    println!("sum: {sum},count: {}", count);
-
-    // 现在，条目已经按照路径进行了排序。
-
-
-    Ok(())
-}
 
 const IMAGE_DIR: &str = "data";
 const MAP_DIR: &str = "map";
@@ -180,7 +148,8 @@ impl ImageAsset {
     pub fn new(dir: String) -> Self {
 
         ImageAsset {
-            dir, file_map: HashMap::with_capacity(1024),
+            dir,
+            file_map: HashMap::with_capacity(1024),
             index_map: HashMap::with_capacity(1024),
             wzx_map: HashMap::with_capacity(1024),
             image_cache: Cache::new(10_000)
@@ -254,6 +223,7 @@ impl ImageAsset {
     fn get_bytes_by_image_key(&mut self, image_key: Option<u32>, file_name: &str, key: u64) {
         if let Some(v) = image_key {
             if let Some(x) = self.get_file_bytes(file_name, v) {
+                println!("name: {}, key: {}, w: {}, h: {}, x: {}, y: {}", file_name, key, x.width, x.height, x.offset_x, x.offset_y);
                 self.image_cache.insert(key, x);
             }
         }
@@ -262,7 +232,7 @@ impl ImageAsset {
     fn get_file_bytes(&self, file_name: &str, seek: u32) -> Option<ImageData> {
         if seek == 0 { return None }
         let path = Path::new(self.dir.as_str()).join(IMAGE_DIR).join(file_name).with_extension(IMAGE_FILE_SUFFIX);
-        println!("file: {}, seek:{}", file_name, seek);
+        // println!("file: {}, seek:{}", file_name, seek);
         if let Ok(f) = File::open(path) {
             let mut buf = BufReader::new(f);
             return read_image_data(&mut buf, seek, 16);

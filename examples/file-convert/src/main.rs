@@ -17,13 +17,27 @@ async fn main() {
     // map.save("EM001.map", Arc::new(Semaphore::new(1))).await;
     // MapAsset::save_all().await;
     // frame::test_frame();
-    cache::create_default_image_asset("/Users/vinter/Dev/Mir2");
+    let mut image_asset = cache::create_default_image_asset("/Users/vinter/Dev/Mir2");
+
+    let option = image_asset.load_image(FileDesc::ZONE { file: 3, number: 0, index: 1 }, FileDescType::IDX);
+    // let option = image_asset.load_image(FileDesc::ZONE { file: 3, number: 0, index: 1 }, FileDescType::IDX);
+    let option = image_asset.load_image(FileDesc::ZONE { file: 3, number: 0, index: 0 }, FileDescType::IDX);
+    let option = image_asset.load_image(FileDesc::ZONE { file: 3, number: 0, index: 1 }, FileDescType::IDX);
+    if let Some(v) = option {
+        println!("{},{},{},{}", v.height, v.width, v.offset_x, v.offset_y);
+    }
+
+    let map = cache::create_map("/Users/vinter/Dev/Mir2", "n0");
+    if let Some(map) = map {
+        println!("map: {}, {}, name: {}, len: {}", map.width, map.height, map.name, map.tiles.len());
+    }
 }
 
 
 use chrono::Local;
 use std::sync::Arc;
 use tokio::{ self, runtime::Runtime, sync::Semaphore, time::{self, Duration}};
+use crate::cache::{FileDesc, FileDescType};
 
 fn now() -> String {
     Local::now().format("%F %T").to_string()
