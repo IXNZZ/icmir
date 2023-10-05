@@ -36,7 +36,7 @@ impl App {
         // /Users/vt/Documents/LegendOfMir/
         // 0x6D, 0x32 ASCII
 
-        Self {map_asset: MapAsset::new("/Users/vinter/Dev/Mir2/", "map/0.map", 1920, 1280),
+        Self {map_asset: MapAsset::new("/Users/vinter/Dev/Mir2/", "map/n0.map", 1920, 1280),
             reload_map: false, point_x: 320, point_y: 280}
     }
 }

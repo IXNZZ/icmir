@@ -5,11 +5,12 @@ use ggez::{Context, event, GameError, GameResult};
 use ggez::audio::AudioContext;
 use ggez::event::{EventHandler, EventLoop};
 use ggez::glam::vec2;
-use ggez::graphics::{BlendComponent, BlendFactor, BlendMode, BlendOperation, Canvas, Color, DrawParam, ImageFormat, Rect};
+use ggez::graphics::{BlendComponent, BlendFactor, BlendMode, BlendOperation, Canvas, Color, DrawMode, DrawParam, FillOptions, ImageEncodingFormat, ImageFormat, Mesh, Rect};
 use ggez::input::keyboard::{KeyboardContext, KeyCode, KeyInput};
 use ggez::mint::Point2;
 use ggez::winit::dpi::{PhysicalPosition, Position};
 use ggez::winit::window::ImePurpose;
+use image::RgbaImage;
 use keyframe::{AnimationSequence, keyframes};
 use keyframe_derive::CanTween;
 use tracing::{debug, info, warn};
@@ -88,6 +89,11 @@ impl App {
         asset.put_file_map(6, "weapon", true);
         asset.put_file_map(7, "humeffect", true);
 
+        let data = asset.load_image(FileDesc::KEY(9007216434610196), FileDescType::IDX).unwrap();
+        //9007216434610196
+        // let image = RgbaImage::from_raw(data.width as u32, data.height as u32, data.bytes.to_vec()).unwrap();
+        let image = ggez::graphics::Image::from_pixels(ctx, data.bytes.as_ref(), ImageFormat::Rgba8UnormSrgb, data.width as u32, data.height as u32);
+
         let animation = PlayerAnimation::new(4, 0, 1, PlayerAction::Stand, Direction::North);
         App { asset, scale_factor: scale_factor as f32 + 0.5, animation}
     }
@@ -96,7 +102,7 @@ impl App {
 impl EventHandler for App {
     fn update(&mut self, ctx: &mut Context) -> Result<(), GameError> {
         let time = ctx.time.delta().as_secs_f64();
-        println!("time: {}", time);
+        // println!("time: {}", time);
         self.animation.advance(time);
         // println!("advance: {}, time: {time}", self.player_animation.duration());
         Ok(())
@@ -127,6 +133,7 @@ impl EventHandler for App {
         if let Some(hair) = hair_image {
             // println!("H:{},W:{},Len: {}", img.height, img.width, img.bytes.len());
             let image = ggez::graphics::Image::from_pixels(ctx, hair.bytes.as_ref(), ImageFormat::Rgba8UnormSrgb, hair.width as u32, hair.height as u32);
+            // image.encode()
             canvas.draw(&image, DrawParam::new()
                 // .offset(vec2(img.offset_x as f32, img.offset_y as f32))
                 .scale(vec2(self.scale_factor, self.scale_factor))
@@ -166,6 +173,8 @@ impl EventHandler for App {
         if let Some(effect) = effect_image {
             // println!("H:{},W:{},Len: {}", img.height, img.width, img.bytes.len());
             let image = ggez::graphics::Image::from_pixels(ctx, effect.bytes.as_ref(), ImageFormat::Rgba8UnormSrgb, effect.width as u32, effect.height as u32);
+            // let (wgpu, view) = image.wgpu();
+
             canvas.draw(&image, DrawParam::new()
                 // .offset(vec2(img.offset_x as f32, img.offset_y as f32))
                 .scale(vec2(self.scale_factor, self.scale_factor))
@@ -173,6 +182,26 @@ impl EventHandler for App {
                 .dest(vec2(  500.0 + effect.offset_x as f32 * self.scale_factor, 500.0 + effect.offset_y as f32 * self.scale_factor )))
 
         }
+
+        canvas.set_blend_mode(BlendMode {
+            color: BlendComponent {
+                src_factor: BlendFactor::DstAlpha,
+                dst_factor: BlendFactor::One,
+                operation: BlendOperation::Add
+            },
+            alpha: BlendComponent {
+                src_factor: BlendFactor::One,
+                dst_factor: BlendFactor::One,
+                operation: BlendOperation::Add
+            }
+        });
+        let red_color = Mesh::new_rectangle(ctx,
+                                            DrawMode::Fill(FillOptions::default()),
+                                            Rect::new(0.0, 0.0, 500.0, 500.0),
+                                            Color::new(1.0, 0.0, 0.0, 1.0))?;
+        canvas.draw(&red_color,
+                    DrawParam::new().dest(vec2(300.0, 300.0)));
+
         canvas.finish(ctx).unwrap();
         Ok(())
     }
@@ -248,7 +277,15 @@ impl EventHandler for App {
 
 
                 VirtualKeyCode::A => {self.animation.dir(Direction::West)}
-                VirtualKeyCode::D => {self.animation.dir(Direction::East)}
+                VirtualKeyCode::D => {
+                    self.animation.dir(Direction::East);
+                    // let data = self.asset.load_image(FileDesc::KEY(9007216434610196), FileDescType::IDX).unwrap();
+                    // //9007216434610196
+                    // let image = RgbaImage::from_raw(data.width as u32, data.height as u32, data.bytes.to_vec()).unwrap();
+                    // // let image = ggez::graphics::Image::from_pixels(ctx, data.bytes.as_ref(), ImageFormat::Rgba8UnormSrgb, data.width as u32, data.height as u32);
+                    // image.save("/Users/vinter/Dev/Mir2/hum.png");
+                    // image.encode(ctx, ImageEncodingFormat::Png, "/Users/vinter/Dev/Mir2/effect.png");
+                }
                 VirtualKeyCode::E => {self.animation.dir(Direction::Northeast)}
                 VirtualKeyCode::Q => {self.animation.dir( Direction::Northwest)}
                 VirtualKeyCode::R => {
