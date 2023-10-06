@@ -102,8 +102,12 @@ pub fn load_index(path: &str) -> Vec<u32> {
 }
 
 pub fn read_wzx(path: &str) -> Vec<u32> {
-    println!("read_wzx {}", path);
-    let mut file = File::open(path).unwrap();
+    // println!("read_wzx {}", path);
+    let file = File::open(path);
+    if !file.is_ok() {
+        return vec![48];
+    }
+    let mut file = file.unwrap();
     let len = file.metadata().unwrap().len();
     let mut data = Vec::with_capacity(len as usize);
     file.read_to_end(&mut data).unwrap();
