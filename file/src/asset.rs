@@ -125,8 +125,15 @@ impl ImageData {
         let offset_y = body.get_i16_le();
         let length = body.get_u32_le();
 
+        // if length == 0 && data.len() > 0 {
+        //     length = data.len() as u32;
+        // }
+
         if length == 0 {
-            Self { width, height, offset_x, offset_y, bytes: Bytes::new() }
+            let bytes = if data.len() > 0 {
+                Bytes::from(byte_to_rgba(pixel, width as usize, height as usize, data))
+            } else { Bytes::new() };
+            Self { width, height, offset_x, offset_y, bytes }
         } else {
             let x = deflate_image(data, width as u32 * height as u32);
             let data = byte_to_rgba(pixel, width as usize, height as usize, &x[..]);
@@ -212,7 +219,11 @@ impl ImageAsset {
             let map = if typ == FileDescType::IDX { &self.index_map} else { &self.wzx_map };
                 let image_key = if let Some(ik) = map.get(&index_key) {
                     if let Some(v) = ik.get((cache_key & 0xFFFFFFFF) as usize) {
-                        Some(*v)
+                        if let Some(len) = ik.get(((cache_key + 1) & 0xFFFFFFFF) as usize) {
+                            Some((*v, *len - *v))
+                        } else {
+                            Some((*v, 16))
+                        }
                     } else { None }
                 } else { None };
 
@@ -220,22 +231,23 @@ impl ImageAsset {
         }
     }
 
-    fn get_bytes_by_image_key(&mut self, image_key: Option<u32>, file_name: &str, key: u64) {
+    fn get_bytes_by_image_key(&mut self, image_key: Option<(u32, u32)>, file_name: &str, key: u64) {
         if let Some(v) = image_key {
-            if let Some(x) = self.get_file_bytes(file_name, v) {
+            if let Some(x) = self.get_file_bytes(file_name, v.0, v.1) {
+                println!("idx: {}, {}", v.0, v.1);
                 println!("name: {}, key: {}, w: {}, h: {}, x: {}, y: {}", file_name, key, x.width, x.height, x.offset_x, x.offset_y);
                 self.image_cache.insert(key, x);
             }
         }
     }
 
-    fn get_file_bytes(&self, file_name: &str, seek: u32) -> Option<ImageData> {
+    fn get_file_bytes(&self, file_name: &str, seek: u32, length: u32) -> Option<ImageData> {
         if seek == 0 { return None }
         let path = Path::new(self.dir.as_str()).join(IMAGE_DIR).join(file_name).with_extension(IMAGE_FILE_SUFFIX);
         // println!("file: {}, seek:{}", file_name, seek);
         if let Ok(f) = File::open(path) {
             let mut buf = BufReader::new(f);
-            return read_image_data(&mut buf, seek, 16);
+            return read_image_data(&mut buf, seek, length);
         }
         None
     }
@@ -357,6 +369,7 @@ fn read_image_data(reader: &mut BufReader<File>, seek: u32, length: u32) -> Opti
     let mut data = vec![0;length as usize];
     reader.seek(SeekFrom::Start(seek as u64)).unwrap();
     read_buffer(reader, &mut data[..]);
+    println!("{:X?}", data.as_slice());
     if length <= 16 {
         let mut x = &data[12..];
         let x = x.get_u32_le();

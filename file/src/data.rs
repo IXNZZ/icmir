@@ -56,7 +56,10 @@ impl ImageData {
         let length = body.get_u32_le();
 
         if length == 0 {
-            Self { width, height, offset_x, offset_y, bytes: Bytes::new() }
+            let bytes = if data.len() > 0 {
+                Bytes::from(byte_to_rgb(pixel, width as usize, height as usize, data))
+            } else { Bytes::new() };
+            Self { width, height, offset_x, offset_y, bytes }
         } else {
             // debug!("S3 length: {}, w: {}, h: {}, pixel: {}", length, width, height, pixel);
             let x = deflate_image(data, width as u32 * height as u32);

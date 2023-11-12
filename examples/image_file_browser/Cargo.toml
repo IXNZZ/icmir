@@ -8,7 +8,7 @@ edition = "2021"
 [dependencies]
 iced = {version = "0.9", features = ["image"]}
 lazy_static = "1.4.0"
-image = "0.24.6"
+image = "0.24.7"
 file = { path = "../../file" }
 tracing = "0.1"
 tracing-subscriber = {version = "0.3", features = ["env-filter"]}
